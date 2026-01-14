@@ -1,0 +1,80 @@
+####################################
+# General
+####################################
+.DS_Store
+Thumbs.db
+*.log
+*.tmp
+*.bak
+
+####################################
+# Environment / Secrets
+####################################
+.env
+.env.*
+frontend/.env
+frontend/.env.*
+backend/.env
+backend/.env.*
+
+####################################
+# Backend - Spring Boot
+####################################
+backend/target/
+backend/build/
+backend/logs/
+backend/*.log
+
+# Spring config files (secrets)
+backend/src/main/resources/application.properties
+backend/src/main/resources/serviceAccountKey.json
+backend/src/main/resources/application-*.properties
+backend/src/main/java/com/campobite/smartcanteen/backend/config/FirebaseConfig.java
+
+####################################
+# Maven / Gradle
+####################################
+**/target/
+**/.gradle/
+**/build/
+
+####################################
+# Frontend - React / Vite
+####################################
+frontend/node_modules/
+frontend/dist/
+frontend/build/
+frontend/.cache
+frontend/.vite
+frontend/npm-debug.log*
+frontend/yarn-debug.log*
+frontend/yarn-error.log*
+
+####################################
+# Database
+####################################
+database/data/
+database/dumps/
+database/*.db
+database/*.sqlite
+database/*.sql.backup
+
+####################################
+# IDE & Editor
+####################################
+.idea/
+.vscode/
+*.iml
+*.swp
+*.swo
+*.swn
+.classpath
+.project
+.settings/
+
+####################################
+# Compiled / Generated
+####################################
+*.class
+*.jar
+*.war

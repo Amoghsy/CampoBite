@@ -1,0 +1,917 @@
+import { useEffect, useState, useCallback } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import api from '@/api/api';
+import { Chatbot } from '@/components/chatbot';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { FeedbackModal } from '@/components/FeedbackModal';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import {
+  Utensils,
+  ShoppingCart,
+  Plus,
+  Minus,
+  Ticket,
+  LogOut,
+  User,
+  CheckCircle,
+  Sparkles,
+  MessageSquare,
+  Clock,
+  Star,
+  History,
+  Bell,
+} from 'lucide-react';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { useToast } from '@/hooks/use-toast';
+import { getFcmToken } from '@/firebase';
+import { listenNotifications } from '@/firebase';
+
+/* ================= TYPES ================= */
+
+export interface MenuItem {
+  id: number;
+  name: string;
+  description: string;
+  price: number;
+  category: 'breakfast' | 'lunch' | 'snacks' | 'beverages';
+  available: boolean;
+  imageUrl: string;
+}
+
+interface CartItem {
+  menuItem: MenuItem;
+  quantity: number;
+}
+
+interface BackendOrder {
+  id: number;
+  tokenNumber: number;
+  status: 'ORDERED' | 'PREPARING' | 'READY' | 'COMPLETED';
+  totalAmount: number;
+  createdAt: string;
+  itemNames?: string;
+}
+
+/* ================= CONSTANTS ================= */
+
+const RAZORPAY_KEY = import.meta.env.VITE_RAZORPAY_KEY;
+
+const steps = [
+  { key: 'ORDERED', label: 'Ordered' },
+  { key: 'PREPARING', label: 'Preparing' },
+  { key: 'READY', label: 'Ready' }
+] as const;
+
+/* ================= COMPONENTS ================= */
+
+function OrderStatusProgress({ status }: { status: BackendOrder['status'] }) {
+  const currentStatusIndex = steps.findIndex(s => s.key === status);
+  // data from backend might be 'COMPLETED', handle it:
+  const activeIndex = currentStatusIndex === -1 && status === 'COMPLETED' ? steps.length : currentStatusIndex;
+
+  return (
+    <div className="flex items-center w-full px-2">
+      {steps.map((step, index) => {
+        const isCompleted = index < activeIndex;
+        const isCurrent = index === activeIndex;
+
+        return (
+          <div key={step.key} className="flex items-center flex-1 last:flex-none">
+            {/* Step Circle */}
+            <div className="flex flex-col items-center relative z-10">
+              <div
+                className={`
+                  relative w-10 h-10 md:w-12 md:h-12 rounded-full flex items-center justify-center text-sm font-semibold transition-all duration-500
+                  ${isCompleted
+                    ? 'bg-emerald-500 text-white shadow-soft'
+                    : isCurrent
+                      ? 'gradient-primary text-white ring-4 ring-emerald-500/20 shadow-glow animate-pulse'
+                      : 'bg-muted text-muted-foreground border-2 border-border'
+                  }
+                `}
+              >
+                {isCompleted ? (
+                  <CheckCircle className="h-5 w-5 md:h-6 md:w-6" />
+                ) : (
+                  <span className={isCurrent ? "font-bold" : ""}>{index + 1}</span>
+                )}
+              </div>
+              <span
+                className={`
+                  absolute top-12 md:top-14 text-[10px] md:text-xs font-medium whitespace-nowrap transition-colors duration-300
+                  ${isCurrent ? 'text-primary font-semibold' : isCompleted ? 'text-emerald-600' : 'text-muted-foreground'}
+                `}
+              >
+                {step.label}
+              </span>
+            </div>
+
+            {/* Connector Line */}
+            {index < steps.length - 1 && (
+              <div className="flex-1 h-1 mx-2 rounded-full overflow-hidden bg-muted -mt-4 md:-mt-6">
+                <div
+                  className={`h-full rounded-full transition-all duration-500 ${isCompleted ? 'w-full bg-emerald-500' : 'w-0'
+                    }`}
+                />
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+/* ================= DASHBOARD ================= */
+
+export default function Dashboard() {
+  const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
+  const [cart, setCart] = useState<CartItem[]>([]);
+  const [activeCategory, setActiveCategory] = useState<'all' | MenuItem['category']>('all');
+  const [user, setUser] = useState<{ name: string; email: string; role?: string; usn?: string } | null>(null);
+  const [activeOrder, setActiveOrder] = useState<BackendOrder | null>(null);
+  const [orderHistory, setOrderHistory] = useState<BackendOrder[]>([]);
+  const [recommendedItems, setRecommendedItems] = useState<MenuItem[]>([]);
+  // Local state for UI order ratings
+  const [orderRatings, setOrderRatings] = useState<Record<number, number>>({});
+
+  // Feedback Modal State
+  const [showFeedbackModal, setShowFeedbackModal] = useState(false);
+  const [lastOrderToken, setLastOrderToken] = useState<string>('');
+  const [lastOrderItems, setLastOrderItems] = useState<string[]>([]);
+  const [lastOrderId, setLastOrderId] = useState<number>(0);
+  const [shownFeedbackForOrderIds, setShownFeedbackForOrderIds] = useState<number[]>(() => {
+    const saved = localStorage.getItem('shownFeedbackForOrderIds');
+    return saved ? JSON.parse(saved) : [];
+  });
+  const [isProcessingOrder, setIsProcessingOrder] = useState(false);
+
+  const { toast } = useToast();
+  const navigate = useNavigate();
+
+  /* ================= HELPERS & HANDLERS ================= */
+
+  const handleLogout = () => {
+    localStorage.removeItem('jwt');
+    localStorage.removeItem('role');
+    localStorage.removeItem('user');
+    navigate('/auth');
+  };
+
+  const loadDashboardData = useCallback(() => {
+    api.get(`/api/dashboard?_t=${Date.now()}`)
+      .then(res => {
+        if (!res.data.user || res.data.user.name === 'guest' || !res.data.user.name) {
+          localStorage.removeItem('token');
+          localStorage.removeItem('role');
+          window.location.href = '/auth';
+          return;
+        }
+        setUser(res.data.user);
+        setActiveOrder(res.data.activeOrder);
+        setOrderHistory(res.data.orderHistory);
+      })
+      .catch((err) => {
+        if (err.response?.status === 401 || err.response?.status === 403) {
+          localStorage.removeItem('token');
+          localStorage.removeItem('role');
+          window.location.href = '/auth';
+        }
+      });
+  }, [navigate]);
+
+  const loadMenu = useCallback(() => {
+    api.get('/api/admin/menu')
+      .then(res => setMenuItems(res.data))
+      .catch((err) => {
+        console.error("Failed to load menu", err);
+        toast({ title: 'Failed to load menu', variant: 'destructive' });
+      });
+  }, [toast]);
+
+  const loadRecommended = useCallback(() => {
+    api.get('/api/admin/menu/recommended')
+      .then(res => setRecommendedItems(res.data))
+      .catch(err => console.error("Failed to load recommendations", err));
+  }, []);
+
+  const addToCart = (item: MenuItem) => {
+    if (!item.available) {
+      toast({
+        title: 'Item Unavailable',
+        description: `${item.name} is currently not available.`,
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setCart(prev => {
+      const found = prev.find(i => i.menuItem.id === item.id);
+      if (found) {
+        return prev.map(i =>
+          i.menuItem.id === item.id
+            ? { ...i, quantity: i.quantity + 1 }
+            : i
+        );
+      }
+      return [...prev, { menuItem: item, quantity: 1 }];
+    });
+
+    toast({
+      title: 'Added to Cart',
+      description: `${item.name} added to your cart.`,
+    });
+  };
+
+  const updateQuantity = (id: number, delta: number) => {
+    setCart(prev =>
+      prev
+        .map(i =>
+          i.menuItem.id === id
+            ? { ...i, quantity: i.quantity + delta }
+            : i
+        )
+        .filter(i => i.quantity > 0)
+    );
+  };
+
+  const cartTotal = cart.reduce(
+    (sum, i) => sum + i.menuItem.price * i.quantity,
+    0
+  );
+
+  const cartCount = cart.reduce((sum, i) => sum + i.quantity, 0);
+
+  const placeOrder = () => {
+    if (!cart.length) return;
+
+    const options = {
+      key: RAZORPAY_KEY,
+      amount: cartTotal * 100,
+      currency: "INR",
+      name: "CampoBite",
+      description: "Smart Canteen Order",
+
+      handler: async () => {
+        try {
+          setIsProcessingOrder(true); // Immediate UI feedback
+          const itemNames = cart.map((c) => `${c.menuItem.name} x${c.quantity}`).join(", ");
+          const res = await api.post("/api/orders", {
+            total: cartTotal,
+            totalAmount: cartTotal,
+            itemNames,
+            items: cart.map((c) => ({
+              menuItemId: c.menuItem.id,
+              quantity: c.quantity,
+            })),
+          });
+
+          toast({
+            title: "Payment Successful 🎉",
+            description: `Token #${res.data.tokenNumber}`,
+          });
+
+          setLastOrderToken(res.data.tokenNumber.toString());
+          setLastOrderItems(cart.map((c) => `${c.menuItem.name} x${c.quantity}`));
+          setLastOrderId(res.data.id);
+
+          setCart([]);
+          setActiveOrder(res.data);
+
+          // Feedback modal will be triggered by the useEffect observing activeOrder
+
+
+        } catch (err) {
+          console.error("ORDER ERROR:", err);
+          toast({
+            title: "Order failed",
+            description: "Unauthorized (JWT missing)",
+            variant: "destructive",
+          });
+        } finally {
+          setIsProcessingOrder(false);
+        }
+      },
+    };
+
+    // @ts-expect-error Razorpay is loaded via script tag
+    new window.Razorpay(options).open();
+  };
+
+  const openFeedback = (order: BackendOrder) => {
+    setLastOrderToken(order.tokenNumber.toString());
+    const items = order.itemNames ? order.itemNames.split(', ') : [];
+    setLastOrderItems(items);
+    setLastOrderId(order.id);
+    setShowFeedbackModal(true);
+  };
+
+
+
+  const rateOrder = (orderId: number, rating: number) => {
+    setOrderRatings(prev => ({ ...prev, [orderId]: rating }));
+    toast({
+      title: "Thanks for rating!",
+      description: `You rated this order ${rating} stars.`,
+    });
+  };
+
+  const filteredItems =
+    activeCategory === 'all'
+      ? menuItems
+      : menuItems.filter(i => i.category === activeCategory);
+
+  const categories: ('all' | MenuItem['category'])[] = [
+    'all', 'breakfast', 'lunch', 'snacks', 'beverages'
+  ];
+
+  /* ================= EFFECTS ================= */
+
+  useEffect(() => {
+    loadDashboardData();
+    loadMenu();
+    loadRecommended();
+
+    const interval = setInterval(() => {
+      loadDashboardData();
+    }, 2000);
+
+    return () => clearInterval(interval);
+  }, [loadDashboardData, loadMenu]);
+
+  useEffect(() => {
+    const initFCM = async () => {
+      const token = await getFcmToken();
+      if (token) {
+        await api.post("/api/user/fcm-token", { token });
+      }
+    };
+    initFCM();
+    listenNotifications();
+  }, []);
+
+  // Monitor activeOrder and history for completion to show feedback modal
+  useEffect(() => {
+    // Check activeOrder first
+    let targetOrder = activeOrder;
+
+    // If activeOrder is null or not completed, check the most recent order from history
+    if ((!targetOrder || targetOrder.status !== 'COMPLETED') && orderHistory.length > 0) {
+      // Assuming orderHistory is sorted latest first, or we take the one with highest ID
+      // backend usually sends sorted, but let's be safe and just take the first one if we assume it's sorted,
+      // or simply find the one with max ID.
+      const latestHistoryOrder = orderHistory[0]; // expecting sorted for now
+      if (latestHistoryOrder.status === 'COMPLETED') {
+        targetOrder = latestHistoryOrder;
+      }
+    }
+
+    if (targetOrder && targetOrder.status === 'COMPLETED') {
+      // Check if we already showed feedback for this order
+      if (!shownFeedbackForOrderIds.includes(targetOrder.id)) {
+        setLastOrderToken(targetOrder.tokenNumber.toString());
+        const items = targetOrder.itemNames ? targetOrder.itemNames.split(', ') : [];
+        setLastOrderItems(items);
+        setLastOrderId(targetOrder.id);
+        setShowFeedbackModal(true);
+
+        // Mark as shown so we don't pop it up again for this session or future sessions
+        const newShownIds = [...shownFeedbackForOrderIds, targetOrder.id];
+        setShownFeedbackForOrderIds(newShownIds);
+        localStorage.setItem('shownFeedbackForOrderIds', JSON.stringify(newShownIds));
+      }
+    }
+  }, [activeOrder, orderHistory, shownFeedbackForOrderIds]);
+
+  /* ================= RENDER ================= */
+
+  return (
+    <div className="min-h-screen bg-background">
+      {/* HEADER */}
+      <header className="sticky top-0 z-50 border-b border-border/50 bg-background/95 backdrop-blur-lg">
+        <div className="container flex h-16 items-center justify-between">
+          <Link to="/" className="flex items-center gap-2.5">
+            <div className="h-10 w-10 rounded-xl gradient-primary flex items-center justify-center shadow-soft">
+              <Utensils className="h-5 w-5 text-white" />
+            </div>
+            <span className="text-xl font-bold">
+              Campo<span className="text-accent">Bite</span>
+            </span>
+          </Link>
+
+          <div className="flex items-center gap-3">
+
+
+            {/* Notification Bell */}
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="ghost" size="icon" className="relative text-muted-foreground hover:text-foreground">
+                  <Bell className="h-5 w-5" />
+                  {activeOrder && activeOrder.status !== 'COMPLETED' && (
+                    <span className="absolute top-2 right-2 h-2 w-2 rounded-full bg-red-500 animate-pulse" />
+                  )}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-80 p-0" align="end">
+                <Card className="border-0 shadow-none">
+                  <CardHeader className="border-b pb-3">
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <Bell className="h-4 w-4" />
+                      Notifications
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="p-0">
+                    {/* Active Order Section */}
+                    {activeOrder && activeOrder.status !== 'COMPLETED' ? (
+                      <div className="p-4 bg-muted/30 border-b">
+                        <div className="flex justify-between items-start mb-2">
+                          <span className="text-sm font-semibold text-primary">Active Order #{activeOrder.tokenNumber}</span>
+                          <Badge className={`
+                                ${activeOrder.status === 'READY' ? 'bg-success text-success-foreground' : 'bg-accent text-accent-foreground'} 
+                            `}>
+                            {activeOrder.status}
+                          </Badge>
+                        </div>
+                        <p className="text-xs text-muted-foreground mb-3">
+                          {activeOrder.itemNames || 'Your delicious food'}
+                        </p>
+                        <div className="w-full h-1.5 bg-muted rounded-full overflow-hidden">
+                          <div
+                            className="h-full bg-primary transition-all duration-500"
+                            style={{
+                              width: activeOrder.status === 'ORDERED' ? '33%' :
+                                activeOrder.status === 'PREPARING' ? '66%' : '100%'
+                            }}
+                          />
+                        </div>
+                        <p className="text-[10px] text-right mt-1 text-muted-foreground">
+                          {activeOrder.status === 'ORDERED' ? 'Order Sent' :
+                            activeOrder.status === 'PREPARING' ? 'Kitchen is preparing' :
+                              'Ready to pick up!'}
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="p-4 text-center text-sm text-muted-foreground border-b">
+                        No active orders right now.
+                      </div>
+                    )}
+
+                    {/* Recent History Section */}
+                    {orderHistory.length > 0 && (
+                      <div className="max-h-[200px] overflow-y-auto">
+                        <div className="p-2 bg-muted/10 text-xs font-semibold text-muted-foreground px-4">
+                          Recent Completed
+                        </div>
+                        {orderHistory.slice(0, 3).map(order => (
+                          <div key={order.id} className="p-3 px-4 border-b last:border-0 hover:bg-muted/20 transition-colors">
+                            <div className="flex justify-between items-center mb-1">
+                              <span className="text-xs font-medium">Order #{order.tokenNumber}</span>
+                              <span className="text-[10px] text-muted-foreground">{new Date(order.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                            </div>
+                            <div className="flex justify-between items-center">
+                              <span className="text-xs text-muted-foreground truncate max-w-[120px]">
+                                {order.status}
+                              </span>
+                              {order.status === 'COMPLETED' && (
+                                <CheckCircle className="h-3 w-3 text-success" />
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </PopoverContent>
+            </Popover>
+            <Link to="/profile" className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-muted/50 hover:bg-muted transition-colors">
+              <div className="h-8 w-8 rounded-full gradient-primary flex items-center justify-center text-white">
+                <User className="h-4 w-4" />
+              </div>
+              <span className="text-sm font-medium hidden md:inline">{user?.name || 'Guest'}</span>
+            </Link>
+            <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground" onClick={handleLogout}>
+              <LogOut className="h-4 w-4 md:mr-2" />
+              <span className="hidden md:inline">Logout</span>
+            </Button>
+          </div>
+        </div>
+      </header>
+
+      <div className="container py-8">
+        <div className="grid lg:grid-cols-3 gap-8">
+          {/* Main Content */}
+          <div className="lg:col-span-2 space-y-8">
+            {/* Welcome Section */}
+            <div className="space-y-2">
+              <h1 className="text-3xl font-bold text-foreground">Welcome back, {user?.name?.split(' ')[0]}! 👋</h1>
+              <p className="text-muted-foreground">Ready to order your favorite campus food?</p>
+            </div>
+
+            {/* Active Order Card */}
+            {/* USN Alert for Students */}
+            {user?.role && user.role.toLowerCase() === 'student' && (!user.usn || user.usn.trim() === '') && (
+              <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-4 flex items-center justify-between animate-in slide-in-from-top-2">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-amber-500/20 rounded-lg text-amber-600">
+                    <Ticket className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <h4 className="font-semibold text-amber-700">Complete your profile</h4>
+                    <p className="text-sm text-amber-600/80">Add your USN to ensure smooth order processing.</p>
+                  </div>
+                </div>
+                <Link to="/profile">
+                  <Button size="sm" variant="outline" className="border-amber-500/30 text-amber-700 hover:bg-amber-500/10">
+                    Update Now
+                  </Button>
+                </Link>
+              </div>
+            )}
+
+            {/* Active Order Card */}
+            {activeOrder && (
+              <Card className="relative overflow-hidden border-2 border-primary/20 bg-gradient-to-br from-primary/5 via-background to-accent/5 shadow-card">
+                <div className="absolute top-0 left-0 w-full h-1 gradient-primary" />
+                <CardContent className="p-6 sm:p-8">
+                  <div className="flex flex-col gap-8">
+                    {/* Order Header */}
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                      <div className="flex items-center gap-4">
+                        <div className="token-badge text-xl shadow-glow">
+                          #{activeOrder.tokenNumber}
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <p className="font-bold text-lg text-foreground">Active Order</p>
+                            <Badge className="bg-orange-100 text-orange-600 border-orange-200">
+                              {activeOrder.status}
+                            </Badge>
+                          </div>
+                          {activeOrder.itemNames && (
+                            <p className="text-sm text-muted-foreground mt-1">
+                              {activeOrder.itemNames}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+
+                      </div>
+                    </div>
+
+                    {/* Order Status Progress */}
+                    <div className="w-full pb-4">
+                      <OrderStatusProgress status={activeOrder.status} />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Recommendations Section */}
+            {recommendedItems.length > 0 && (
+              <div className="space-y-4">
+                <div className="flex items-center gap-2 text-lg font-semibold">
+                  <div className="h-8 w-8 rounded-lg bg-accent/10 flex items-center justify-center">
+                    <Sparkles className="h-4 w-4 text-accent" />
+                  </div>
+                  Recommended for You
+                </div>
+                <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-hide">
+                  {recommendedItems.map(item => (
+                    <Card key={item.id} className="min-w-[280px] md:min-w-[320px] overflow-hidden flex flex-col bg-card/50 hover:bg-card transition-colors border-accent/20">
+                      <div className="h-32 relative overflow-hidden bg-muted">
+                        <img src={item.imageUrl} alt={item.name} className="w-full h-full object-cover" />
+                        {!item.available && (
+                          <div className="absolute inset-0 bg-background/70 backdrop-blur-sm flex items-center justify-center">
+                            <Badge variant="secondary" className="text-xs">Out of Stock</Badge>
+                          </div>
+                        )}
+                      </div>
+                      <CardContent className="p-4 flex-1 flex flex-col">
+                        <div className="flex justify-between items-start mb-2">
+                          <h4 className="font-semibold truncate">{item.name}</h4>
+                          <span className="font-bold">₹{item.price}</span>
+                        </div>
+                        <Button
+                          size="sm"
+                          className="w-full mt-auto gradient-primary text-white border-0 shadow-soft hover:shadow-glow transition-all"
+                          onClick={() => addToCart(item)}
+                          disabled={!item.available}
+                        >
+                          <Plus className="h-3 w-3 mr-1" /> Add
+                        </Button>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              </div>
+            )}
+
+
+            {/* Tabs */}
+            <Tabs defaultValue="menu" className="space-y-6">
+              <TabsList className="bg-muted/20 p-1 w-full justify-start">
+                <TabsTrigger value="menu" className="flex-1 md:flex-none data-[state=active]:gradient-primary data-[state=active]:text-white">
+                  Menu
+                </TabsTrigger>
+                <TabsTrigger value="history" className="flex-1 md:flex-none data-[state=active]:gradient-primary data-[state=active]:text-white">
+                  Order History
+                </TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="menu" className="space-y-6">
+                {/* Category Filter */}
+                <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
+                  {categories.map(cat => (
+                    <Button
+                      key={cat}
+                      variant={activeCategory === cat ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => setActiveCategory(cat)}
+                      className={`rounded-full transition-all duration-200 capitalize ${activeCategory === cat
+                        ? 'gradient-primary border-0 shadow-soft text-white'
+                        : 'hover:border-accent/50 hover:bg-accent/5'
+                        }`}
+                    >
+                      {cat}
+                    </Button>
+                  ))}
+                </div>
+
+                <div className="grid sm:grid-cols-2 gap-5">
+                  {filteredItems.map(item => (
+                    <Card
+                      key={item.id}
+                      className={`menu-card overflow-hidden h-full flex flex-col ${!item.available ? 'opacity-60 grayscale-[30%]' : ''}`}
+                    >
+                      <div className="aspect-video relative overflow-hidden bg-muted">
+                        <img
+                          src={item.imageUrl}
+                          alt={item.name}
+                          className="w-full h-full object-cover transition-transform duration-500 hover:scale-105"
+                        />
+                        {!item.available && (
+                          <div className="absolute inset-0 bg-background/70 backdrop-blur-sm flex items-center justify-center">
+                            <Badge variant="secondary" className="text-sm px-4 py-1.5 bg-background/90 border-destructive/30 text-destructive">
+                              Out of Stock
+                            </Badge>
+                          </div>
+                        )}
+                      </div>
+                      <CardContent className="p-5 flex-1 flex flex-col">
+                        <div className="flex justify-between items-start mb-3 flex-1">
+                          <div className="flex-1 min-w-0">
+                            <h3 className="font-semibold text-foreground text-lg truncate">{item.name}</h3>
+                            <p className="text-sm text-muted-foreground line-clamp-2 mt-1">
+                              {item.description}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center justify-between pt-3 border-t border-border/50 mt-auto">
+                          <div>
+                            <p className="text-xl font-bold text-foreground">₹{item.price}</p>
+                          </div>
+                          <Button
+                            size="sm"
+                            onClick={() => addToCart(item)}
+                            disabled={!item.available}
+                            className="gradient-primary border-0 shadow-soft hover:shadow-glow transition-all text-white"
+                          >
+                            <Plus className="h-4 w-4 mr-1" /> Add
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                  {filteredItems.length === 0 && (
+                    <div className="col-span-2 text-center py-12 text-muted-foreground">
+                      No items found in this category.
+                    </div>
+                  )}
+                </div>
+              </TabsContent>
+
+              <TabsContent value="history">
+                <Card className="shadow-soft">
+                  <CardHeader className="border-b border-border/50">
+                    <CardTitle className="flex items-center gap-2">
+                      <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center">
+                        <History className="h-4 w-4 text-primary" />
+                      </div>
+                      Your Order History
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="p-6">
+                    <div className="space-y-4">
+                      {orderHistory.map((o) => {
+                        const currentRating = orderRatings[o.id] || 0;
+                        return (
+                          <div key={o.id} className="p-5 rounded-2xl bg-muted/30 border border-border/50 space-y-4 hover:border-accent/30 transition-colors">
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                              <div className="flex items-center gap-4">
+                                <div className="token-badge-sm">#{o.tokenNumber}</div>
+                                <div>
+                                  <p className="font-semibold text-foreground">
+                                    {o.itemNames || 'Order items'}
+                                  </p>
+                                  <p className="text-sm text-muted-foreground mt-0.5">
+                                    {new Date(o.createdAt).toLocaleDateString()}
+                                  </p>
+                                </div>
+                              </div>
+                              <div className="flex items-center justify-between sm:block text-right">
+                                <p className="text-lg font-bold text-foreground">₹{o.totalAmount}</p>
+                                <Badge className="bg-muted text-muted-foreground border-border text-xs mt-1">
+                                  {o.status}
+                                </Badge>
+                              </div>
+                            </div>
+
+                            {/* Simple Feedback Section */}
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-3 border-t border-border/30">
+                              <div className="flex items-center gap-2">
+                                <span className="text-sm text-muted-foreground">Rate:</span>
+                                <div className="flex gap-0.5">
+                                  {[1, 2, 3, 4, 5].map((star) => (
+                                    <button
+                                      key={star}
+                                      type="button"
+                                      className="p-1 hover:scale-110 transition-all"
+                                      onClick={() => rateOrder(o.id, star)}
+                                    >
+                                      <Star
+                                        className={`h-4 w-4 ${star <= currentRating
+                                          ? 'fill-yellow-400 text-yellow-400'
+                                          : 'text-muted-foreground/30 hover:text-yellow-400'
+                                          }`}
+                                      />
+                                    </button>
+                                  ))}
+                                </div>
+                              </div>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="rounded-full text-xs border-accent/30 text-accent hover:bg-accent/10"
+                                onClick={() => openFeedback(o)}
+                              >
+                                <MessageSquare className="h-3 w-3 mr-1.5" />
+                                Detailed Feedback
+                              </Button>
+                            </div>
+                          </div>
+                        )
+                      })}
+                      {orderHistory.length === 0 && (
+                        <div className="text-center py-8 text-muted-foreground">No past orders found.</div>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+            </Tabs>
+          </div>
+
+          {/* Cart Sidebar */}
+          <div className="lg:col-span-1" id="cart-section">
+            <Card className="sticky top-24 shadow-card border-border/50">
+              <CardHeader className="pb-4 border-b border-border/50">
+                <CardTitle className="flex items-center gap-2">
+                  <div className="h-8 w-8 rounded-lg gradient-primary flex items-center justify-center shadow-soft">
+                    <ShoppingCart className="h-4 w-4 text-white" />
+                  </div>
+                  Your Cart
+                  {cartCount > 0 && (
+                    <Badge className="ml-auto gradient-accent border-0 text-white">{cartCount}</Badge>
+                  )}
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-5 space-y-4">
+                {cart.length === 0 ? (
+                  <div className="text-center py-12">
+                    <div className="h-16 w-16 mx-auto mb-4 rounded-2xl bg-muted/50 flex items-center justify-center">
+                      <ShoppingCart className="h-8 w-8 text-muted-foreground/50" />
+                    </div>
+                    <p className="font-medium text-foreground">Your cart is empty</p>
+                    <p className="text-sm text-muted-foreground mt-1">Add items from the menu</p>
+                  </div>
+                ) : isProcessingOrder ? (
+                  <div className="flex flex-col items-center justify-center py-12 space-y-4 animate-in fade-in">
+                    <div className="h-12 w-12 border-4 border-primary/30 border-t-primary rounded-full animate-spin" />
+                    <p className="font-medium text-foreground">Generating Token...</p>
+                    <p className="text-sm text-muted-foreground">Please wait while we secure your order.</p>
+                  </div>
+                ) : (
+                  <>
+                    <div className="space-y-3 max-h-72 overflow-y-auto pr-1">
+                      {cart.map(item => (
+                        <div key={item.menuItem.id} className="flex items-center justify-between p-4 rounded-xl bg-muted/30 border border-border/50">
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium text-sm truncate text-foreground">
+                              {item.menuItem.name}
+                            </p>
+                            <p className="text-sm text-muted-foreground">
+                              ₹{item.menuItem.price} × {item.quantity}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Button
+                              variant="outline"
+                              size="icon"
+                              className="h-8 w-8 rounded-lg hover:bg-destructive/10 hover:border-destructive/50 hover:text-destructive"
+                              onClick={() => updateQuantity(item.menuItem.id, -1)}
+                            >
+                              <Minus className="h-3 w-3" />
+                            </Button>
+                            <span className="w-6 text-center font-semibold text-foreground">{item.quantity}</span>
+                            <Button
+                              variant="outline"
+                              size="icon"
+                              className="h-8 w-8 rounded-lg hover:bg-emerald-500/10 hover:border-emerald-500/50 hover:text-emerald-600"
+                              onClick={() => updateQuantity(item.menuItem.id, 1)}
+                            >
+                              <Plus className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="border-t border-border/50 pt-5 space-y-4">
+                      <div className="flex justify-between items-center">
+                        <span className="text-muted-foreground">Subtotal</span>
+                        <span className="text-lg font-medium text-foreground">₹{cartTotal}</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="font-semibold text-foreground">Total</span>
+                        <span className="text-2xl font-bold text-foreground">₹{cartTotal}</span>
+                      </div>
+                      <Button
+                        className="w-full h-14 text-base gradient-primary border-0 shadow-soft hover:shadow-glow transition-all text-white"
+                        onClick={placeOrder}
+                        disabled={isProcessingOrder}
+                      >
+                        {isProcessingOrder ? (
+                          <span className="flex items-center gap-2">
+                            <div className="h-4 w-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                            Processing...
+                          </span>
+                        ) : (
+                          <>
+                            <Ticket className="h-5 w-5 mr-2" />
+                            Place Order & Get Token
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                  </>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      </div>
+
+      <Chatbot />
+
+      {/* Mobile Sticky Cart Footer */}
+      {
+        cart.length > 0 && (
+          <div className="fixed bottom-0 left-0 w-full p-4 bg-background/80 backdrop-blur-lg border-t border-border z-40 md:hidden animate-slide-up">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">{cartCount} items</p>
+                <p className="text-lg font-bold text-foreground">₹{cartTotal}</p>
+              </div>
+              <Button
+                className="gradient-primary text-white shadow-soft rounded-xl px-8"
+                onClick={() => {
+                  document.getElementById('cart-section')?.scrollIntoView({ behavior: 'smooth' });
+                }}
+              >
+                View Cart
+              </Button>
+            </div>
+          </div>
+        )
+      }
+
+      <FeedbackModal
+        isOpen={showFeedbackModal}
+        onClose={() => setShowFeedbackModal(false)}
+        orderToken={lastOrderToken}
+        orderItems={lastOrderItems}
+        orderId={lastOrderId}
+      />
+    </div >
+  );
+}
