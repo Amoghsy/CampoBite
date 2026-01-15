@@ -224,6 +224,7 @@ export default function Auth() {
                   <Input
                     placeholder="Email"
                     type="email"
+                    id="email"
                     value={loginData.email}
                     onChange={(e) =>
                       setLoginData({ ...loginData, email: e.target.value })
@@ -235,6 +236,7 @@ export default function Auth() {
                     <Input
                       placeholder="Password"
                       type={showPassword ? 'text' : 'password'}
+                      id="password"
                       value={loginData.password}
                       onChange={(e) =>
                         setLoginData({ ...loginData, password: e.target.value })

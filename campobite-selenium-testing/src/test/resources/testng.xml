@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE suite SYSTEM "https://testng.org/testng-1.0.dtd">
+<suite name="CampoBite Test Suite" parallel="classes" thread-count="3">
+    
+    <listeners>
+        <!-- Add listeners here if needed (e.g., ExtentReports) -->
+    </listeners>
+
+    <test name="Functional Tests">
+        <classes>
+            <class name="com.campobite.testing.tests.LoginTest"/>
+            <class name="com.campobite.testing.tests.MenuTest"/>
+            <class name="com.campobite.testing.tests.CartTest"/>
+            <class name="com.campobite.testing.tests.OrderTest"/>
+            <class name="com.campobite.testing.tests.AdminTest"/>
+        </classes>
+    </test>
+</suite>
