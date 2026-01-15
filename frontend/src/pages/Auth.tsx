@@ -299,6 +299,7 @@ export default function Auth() {
                     <SelectContent>
                       <SelectItem value="student">Student</SelectItem>
                       <SelectItem value="faculty">Faculty</SelectItem>
+                      
 
 
                     </SelectContent>
