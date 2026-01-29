@@ -24,6 +24,7 @@ public class EmailService {
                     message, true);
 
             helper.setTo(toEmail);
+            helper.setFrom("amoghsys891@gmail.com");
             helper.setSubject("🍽️ CampoBite Order Confirmed #" + tokenNumber);
 
             StringBuilder itemsHtml = new StringBuilder();
@@ -105,6 +106,7 @@ public class EmailService {
                     message, true);
 
             helper.setTo(toEmail);
+            helper.setFrom("amoghsys891@gmail.com");
             helper.setSubject("Re: Your Query - CampoBite");
 
             String htmlContent = """
