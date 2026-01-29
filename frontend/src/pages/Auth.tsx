@@ -117,7 +117,7 @@ export default function Auth() {
   /* ================= GOOGLE SIGNUP ================= */
   const handleGoogleSignup = async (res: any) => {
     try {
-      await axios.post(`${API}/google/signup`, {
+      await axios.post(`${API}/api/auth/google/signup`, {
         token: res.credential,
       });
 
@@ -153,7 +153,7 @@ export default function Auth() {
   /* ================= GOOGLE LOGIN ================= */
   const handleGoogleLogin = async (res: any) => {
     try {
-      const response = await axios.post(`${API}/google/login`, {
+      const response = await axios.post(`${API}/api/auth/google/login`, {
         token: res.credential,
       });
 
