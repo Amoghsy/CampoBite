@@ -29,7 +29,6 @@ backend/*.log
 backend/src/main/resources/application.properties
 backend/src/main/resources/serviceAccountKey.json
 backend/src/main/resources/application-*.properties
-backend/src/main/java/com/campobite/smartcanteen/backend/config/FirebaseConfig.java
 backend/target/
 
 ####################################
