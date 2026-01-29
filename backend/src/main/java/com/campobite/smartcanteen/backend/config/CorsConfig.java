@@ -15,9 +15,14 @@ public class CorsConfig {
     public CorsConfigurationSource corsConfigurationSource() {
 
         CorsConfiguration config = new CorsConfiguration();
+
         config.setAllowCredentials(true);
-        config.setAllowedOriginPatterns(List.of("http://localhost:*"));
-        config.setAllowedOriginPatterns(List.of("https://campobite.vercel.app/"));
+
+        config.setAllowedOriginPatterns(List.of(
+                "http://localhost:*",
+                "https://campobite.vercel.app"
+        ));
+
         config.setAllowedHeaders(List.of("*"));
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
 
