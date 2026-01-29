@@ -3,6 +3,8 @@ package com.campobite.smartcanteen.backend.order;
 import com.campobite.smartcanteen.backend.notification.NotificationService;
 import com.campobite.smartcanteen.backend.user.User;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.http.ResponseEntity;
+
 
 import java.util.List;
 import java.util.Map;
@@ -36,25 +38,41 @@ public class AdminOrderController {
     }
 
     @PutMapping("/{orderId}/status")
-    public Order updateStatus(
+    public ResponseEntity<?> updateStatus(
             @PathVariable Long orderId,
             @RequestBody Map<String, String> payload) {
+
         String status = payload.get("status");
-        Order order = orderRepo.findById(orderId).orElseThrow(() -> new RuntimeException("Order not found"));
+
+        Order order = orderRepo.findById(orderId)
+                .orElseThrow(() -> new RuntimeException("Order not found"));
+
         if ("COMPLETED".equals(status)) {
             order.setCompletedAt(java.time.LocalDateTime.now());
         }
+
         order.setStatus(status);
         Order savedOrder = orderRepo.save(order);
 
-        User user = savedOrder.getUser();
-        if (user != null && user.getFcmToken() != null && !user.getFcmToken().isBlank()) {
-            notificationService.sendOrderUpdate(
-                    user.getFcmToken(),
-                    status,
-                    savedOrder.getTokenNumber());
+        try {
+            User user = savedOrder.getUser();
+            if (user != null &&
+                    user.getFcmToken() != null &&
+                    !user.getFcmToken().isBlank()) {
+
+                notificationService.sendOrderUpdate(
+                        user.getFcmToken(),
+                        status,
+                        savedOrder.getTokenNumber()
+                );
+            }
+        } catch (Exception e) {
+            // 🔥 DO NOT break the API
+            System.err.println("FCM notification failed: " + e.getMessage());
         }
-        return savedOrder;
+
+        return ResponseEntity.ok(savedOrder);
     }
+
 
 }
