@@ -21,7 +21,7 @@ public class EmailService {
         try {
             jakarta.mail.internet.MimeMessage message = mailSender.createMimeMessage();
             org.springframework.mail.javamail.MimeMessageHelper helper = new org.springframework.mail.javamail.MimeMessageHelper(
-                    message, true);
+                    message, true,"UTF-8");
 
             helper.setTo(toEmail);
             helper.setFrom("amoghsys891@gmail.com");
@@ -103,7 +103,7 @@ public class EmailService {
         try {
             jakarta.mail.internet.MimeMessage message = mailSender.createMimeMessage();
             org.springframework.mail.javamail.MimeMessageHelper helper = new org.springframework.mail.javamail.MimeMessageHelper(
-                    message, true);
+                    message, true,"UTF-8");
 
             helper.setTo(toEmail);
             helper.setFrom("amoghsys891@gmail.com");
