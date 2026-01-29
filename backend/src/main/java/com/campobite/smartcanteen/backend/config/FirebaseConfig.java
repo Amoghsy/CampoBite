@@ -42,7 +42,7 @@ import java.io.InputStream;
 @Configuration
 public class FirebaseConfig {
 
-    @PostConstruct
+   /* @PostConstruct
     public void init() {
         try {
             InputStream serviceAccount;
@@ -72,4 +72,41 @@ public class FirebaseConfig {
             e.printStackTrace();
         }
     }
+
+    */
+   @PostConstruct
+   public void init() {
+       try {
+           File renderSecret = new File("/etc/secrets/firebase-service-account.json");
+
+           System.out.println("DEBUG → Secret exists: " + renderSecret.exists());
+           System.out.println("DEBUG → Secret readable: " + renderSecret.canRead());
+           System.out.println("DEBUG → Secret path: " + renderSecret.getAbsolutePath());
+
+           InputStream serviceAccount;
+
+           if (renderSecret.exists()) {
+               serviceAccount = new FileInputStream(renderSecret);
+               System.out.println("Using Render secret file");
+           } else {
+               serviceAccount =
+                       new FileInputStream("src/main/resources/serviceAccountKey.json");
+               System.out.println("Using local Firebase key");
+           }
+
+           FirebaseOptions options = FirebaseOptions.builder()
+                   .setCredentials(GoogleCredentials.fromStream(serviceAccount))
+                   .build();
+
+           if (FirebaseApp.getApps().isEmpty()) {
+               FirebaseApp.initializeApp(options);
+               System.out.println("🔥 Firebase initialized");
+           }
+
+       } catch (Exception e) {
+           System.err.println("❌ Firebase initialization failed");
+           e.printStackTrace();
+       }
+   }
+
 }
