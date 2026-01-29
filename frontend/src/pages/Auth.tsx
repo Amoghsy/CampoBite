@@ -51,7 +51,7 @@ export default function Auth() {
     try {
       setIsLoading(true);
 
-      await axios.post(`${API}/signup`, {
+      await axios.post(`${API}/api/auth/signup`, {
         name: signupData.name,
         email: signupData.email,
         password: signupData.password,
@@ -84,7 +84,7 @@ export default function Auth() {
     console.log("LOGIN BUTTON CLICKED");
 
     try {
-      const res = await axios.post(`${API}/login`, loginData);
+      const res = await axios.post(`${API}/api/auth/login`, loginData);
 
       console.log("AXIOS RESPONSE:", res.data);
 
