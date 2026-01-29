@@ -36,37 +36,36 @@ import com.google.firebase.FirebaseApp;
 import com.google.firebase.FirebaseOptions;
 import jakarta.annotation.PostConstruct;
 import org.springframework.context.annotation.Configuration;
-
-import java.io.ByteArrayInputStream;
-import java.util.Base64;
-
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.InputStream;
 @Configuration
 public class FirebaseConfig {
 
     @PostConstruct
     public void init() {
         try {
-            String base64Key = System.getenv("FIREBASE_SERVICE_ACCOUNT_BASE64");
+            InputStream serviceAccount;
 
-            if (base64Key == null || base64Key.isEmpty()) {
-                throw new RuntimeException("FIREBASE_SERVICE_ACCOUNT_BASE64 is missing");
+            File renderSecret = new File("/etc/secrets/firebase-service-account.json");
+
+            if (renderSecret.exists()) {
+                serviceAccount = new FileInputStream(renderSecret);
+                System.out.println("Using Render secret file");
+            } else {
+                serviceAccount =
+                        new FileInputStream("src/main/resources/serviceAccountKey.json");
+                System.out.println("Using local Firebase key");
             }
 
-            byte[] decodedKey = Base64.getDecoder().decode(base64Key);
-
             FirebaseOptions options = FirebaseOptions.builder()
-                    .setCredentials(
-                            GoogleCredentials.fromStream(
-                                    new ByteArrayInputStream(decodedKey)
-                            )
-                    )
+                    .setCredentials(GoogleCredentials.fromStream(serviceAccount))
                     .build();
 
             if (FirebaseApp.getApps().isEmpty()) {
                 FirebaseApp.initializeApp(options);
+                System.out.println("🔥 Firebase initialized");
             }
-
-            System.out.println("✅ Firebase initialized successfully");
 
         } catch (Exception e) {
             System.err.println("❌ Firebase initialization failed");
