@@ -4,7 +4,7 @@ importScripts('https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js'
 importScripts('https://www.gstatic.com/firebasejs/10.7.1/firebase-messaging-compat.js');
 
 firebase.initializeApp({
- apiKey: "AIzaSyDSfcNspKnmTuRsAzD2JJERxoK4-urvZ-g",
+   apiKey: "AIzaSyDSfcNspKnmTuRsAzD2JJERxoK4-urvZ-g",
   authDomain: "campobite-fc485.firebaseapp.com",
   projectId: "campobite-fc485",
   storageBucket: "campobite-fc485.firebasestorage.app",
@@ -16,10 +16,14 @@ firebase.initializeApp({
 const messaging = firebase.messaging();
 
 messaging.onBackgroundMessage(function (payload) {
-  console.log('[firebase-messaging-sw.js] Background message ', payload);
+  console.log('[SW] Background message:', payload);
 
-  self.registration.showNotification(payload.notification.title, {
-    body: payload.notification.body,
-    icon: '/logo.png',
+  // ✅ USE payload.data (NOT payload.notification)
+  const title = payload.data?.title || "CampoBite";
+  const body = payload.data?.body || "You have a new update";
+
+  self.registration.showNotification(title, {
+    body: body,
+    icon: '/logo.png'
   });
 });
