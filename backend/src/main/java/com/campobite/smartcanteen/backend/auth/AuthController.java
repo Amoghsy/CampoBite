@@ -21,6 +21,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/auth")
 @CrossOrigin(origins = "https://campobite.vercel.app")
+//@CrossOrigin(origins = "https://localhost:8081")
 
 public class AuthController {
 
