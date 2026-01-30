@@ -2,7 +2,6 @@ package com.campobite.smartcanteen.backend.notification;
 
 import com.google.firebase.messaging.FirebaseMessaging;
 import com.google.firebase.messaging.Message;
-import com.google.firebase.messaging.Notification;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -10,16 +9,35 @@ public class NotificationService {
 
     public void sendOrderUpdate(String fcmToken, String status, int tokenNumber) {
 
-        Message message = Message.builder()
-                .setToken(fcmToken)
-                .setNotification(
-                        Notification.builder()
-                                .setTitle("Order Update 🍽️")
-                                .setBody("Your order #" + tokenNumber + " is now " + status)
-                                .build())
-                .putData("status", status)
-                .build();
+        if (fcmToken == null || fcmToken.isBlank()) {
+            System.out.println("❌ FCM token is null or empty. Notification not sent.");
+            return;
+        }
 
-        FirebaseMessaging.getInstance().sendAsync(message);
+        try {
+            // ✅ DATA-ONLY MESSAGE (REQUIRED FOR WEB)
+            Message message = Message.builder()
+                    .setToken(fcmToken)
+                    .putData("title", "Order Update 🍽️")
+                    .putData(
+                            "body",
+                            "Your order #" + tokenNumber + " is now " + status
+                    )
+                    .putData("status", status)
+                    .putData("tokenNumber", String.valueOf(tokenNumber))
+                    .putData("type", "ORDER_STATUS")
+                    .build();
+
+            // ✅ SEND SYNCHRONOUSLY + LOG RESULT
+            String response = FirebaseMessaging.getInstance().send(message);
+
+            System.out.println("🔥 FCM SENT SUCCESSFULLY");
+            System.out.println("➡ Token: " + fcmToken);
+            System.out.println("➡ Response: " + response);
+
+        } catch (Exception e) {
+            System.err.println("❌ FCM FAILED");
+            e.printStackTrace();
+        }
     }
 }
