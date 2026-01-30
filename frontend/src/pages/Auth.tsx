@@ -259,10 +259,12 @@ export default function Auth() {
 
                   <div className="text-center text-xs text-muted-foreground">OR</div>
 
-                  <GoogleLogin
-                    onSuccess={handleGoogleLogin}
-                    onError={() => console.log('Google Login Failed')}
-                  />
+                  <div className="flex justify-center w-full">
+                    <GoogleLogin
+                      onSuccess={handleGoogleLogin}
+                      onError={() => console.log('Google Login Failed')}
+                    />
+                  </div>
                 </form>
               </TabsContent>
 
@@ -300,7 +302,7 @@ export default function Auth() {
                     <SelectContent>
                       <SelectItem value="student">Student</SelectItem>
                       <SelectItem value="faculty">Faculty</SelectItem>
-                      
+
 
 
                     </SelectContent>
@@ -346,10 +348,12 @@ export default function Auth() {
 
                   <div className="text-center text-xs text-muted-foreground">OR</div>
 
-                  <GoogleLogin
-                    onSuccess={handleGoogleSignup}
-                    onError={() => console.log('Google Signup Failed')}
-                  />
+                  <div className="flex justify-center w-full">
+                    <GoogleLogin
+                      onSuccess={handleGoogleSignup}
+                      onError={() => console.log('Google Signup Failed')}
+                    />
+                  </div>
                 </form>
               </TabsContent>
             </Tabs>
