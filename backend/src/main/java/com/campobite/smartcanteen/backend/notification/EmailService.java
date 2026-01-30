@@ -1,6 +1,7 @@
 package com.campobite.smartcanteen.backend.notification;
 
 import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -12,6 +13,7 @@ public class EmailService {
         this.mailSender = mailSender;
     }
 
+    @Async
     public void sendOrderConfirmation(
             String toEmail,
             String customerName,
@@ -21,7 +23,7 @@ public class EmailService {
         try {
             jakarta.mail.internet.MimeMessage message = mailSender.createMimeMessage();
             org.springframework.mail.javamail.MimeMessageHelper helper = new org.springframework.mail.javamail.MimeMessageHelper(
-                    message, true,"UTF-8");
+                    message, true, "UTF-8");
 
             helper.setTo(toEmail);
             helper.setFrom("amoghsys891@gmail.com");
@@ -99,11 +101,12 @@ public class EmailService {
         }
     }
 
+    @Async
     public void sendQueryReply(String toEmail, String query, String reply) {
         try {
             jakarta.mail.internet.MimeMessage message = mailSender.createMimeMessage();
             org.springframework.mail.javamail.MimeMessageHelper helper = new org.springframework.mail.javamail.MimeMessageHelper(
-                    message, true,"UTF-8");
+                    message, true, "UTF-8");
 
             helper.setTo(toEmail);
             helper.setFrom("amoghsys891@gmail.com");

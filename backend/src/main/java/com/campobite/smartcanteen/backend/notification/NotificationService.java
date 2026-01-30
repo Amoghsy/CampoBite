@@ -2,11 +2,13 @@ package com.campobite.smartcanteen.backend.notification;
 
 import com.google.firebase.messaging.FirebaseMessaging;
 import com.google.firebase.messaging.Message;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
 @Service
 public class NotificationService {
 
+    @Async
     public void sendOrderUpdate(String fcmToken, String status, int tokenNumber) {
 
         if (fcmToken == null || fcmToken.isBlank()) {
@@ -21,8 +23,7 @@ public class NotificationService {
                     .putData("title", "Order Update 🍽️")
                     .putData(
                             "body",
-                            "Your order #" + tokenNumber + " is now " + status
-                    )
+                            "Your order #" + tokenNumber + " is now " + status)
                     .putData("status", status)
                     .putData("tokenNumber", String.valueOf(tokenNumber))
                     .putData("type", "ORDER_STATUS")
