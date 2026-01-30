@@ -22,7 +22,9 @@ import {
   Star,
   History,
   Bell,
+  X,
 } from 'lucide-react';
+import { Input } from '@/components/ui/input';
 import {
   Popover,
   PopoverContent,
@@ -59,7 +61,7 @@ interface CartItem {
 interface BackendOrder {
   id: number;
   tokenNumber: number;
-  status: 'ORDERED' | 'PREPARING' | 'READY' | 'COMPLETED';
+  status: 'ORDERED' | 'PREPARING' | 'READY' | 'COMPLETED' | 'CANCELLED';
   totalAmount: number;
   createdAt: string;
   itemNames?: string;
@@ -160,6 +162,10 @@ export default function Dashboard() {
   });
   const [isProcessingOrder, setIsProcessingOrder] = useState(false);
 
+  // Coupon State
+  const [couponCode, setCouponCode] = useState('');
+  const [appliedCoupon, setAppliedCoupon] = useState<{ code: string; discountPercentage: number } | null>(null);
+
   const { toast } = useToast();
   const navigate = useNavigate();
 
@@ -254,14 +260,51 @@ export default function Dashboard() {
     0
   );
 
+  const discountAmount = appliedCoupon
+    ? (cartTotal * appliedCoupon.discountPercentage) / 100
+    : 0;
+
+  const finalTotal = cartTotal - discountAmount;
+
   const cartCount = cart.reduce((sum, i) => sum + i.quantity, 0);
+
+  const validateCoupon = async () => {
+    if (!couponCode.trim()) return;
+    try {
+      const res = await api.post('/api/coupons/validate', { code: couponCode });
+      setAppliedCoupon({
+        code: res.data.code,
+        discountPercentage: res.data.discountPercentage
+      });
+      toast({
+        title: 'Coupon Applied!',
+        description: `You saved ${res.data.discountPercentage}%!`,
+      });
+    } catch (err: any) {
+      setAppliedCoupon(null);
+
+      // Robust error parsing: Backend might send plain string "Invalid ..." or JSON { message: "..." }
+      const errorMessage = err.response?.data?.message || err.response?.data || 'Could not apply coupon.';
+
+      toast({
+        title: 'Coupon Error', // more generic title covering Expired/Inactive/Invalid
+        description: typeof errorMessage === 'string' ? errorMessage : 'Invalid coupon code',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const removeCoupon = () => {
+    setAppliedCoupon(null);
+    setCouponCode('');
+  };
 
   const placeOrder = () => {
     if (!cart.length) return;
 
     const options = {
       key: RAZORPAY_KEY,
-      amount: cartTotal * 100,
+      amount: Math.round(finalTotal * 100), // Razorpay expects paise, integers
       currency: "INR",
       name: "CampoBite",
       description: "Smart Canteen Order",
@@ -271,13 +314,14 @@ export default function Dashboard() {
           setIsProcessingOrder(true); // Immediate UI feedback
           const itemNames = cart.map((c) => `${c.menuItem.name} x${c.quantity}`).join(", ");
           const res = await api.post("/api/orders", {
-            total: cartTotal,
-            totalAmount: cartTotal,
+            total: finalTotal,
+            totalAmount: finalTotal,
             itemNames,
             items: cart.map((c) => ({
               menuItemId: c.menuItem.id,
               quantity: c.quantity,
             })),
+            couponCode: appliedCoupon?.code || null
           });
 
           toast({
@@ -290,6 +334,8 @@ export default function Dashboard() {
           setLastOrderId(res.data.id);
 
           setCart([]);
+          setAppliedCoupon(null);
+          setCouponCode('');
           // Add new order to activeOrders immediately
           setActiveOrders(prev => [res.data, ...prev]);
 
@@ -328,6 +374,24 @@ export default function Dashboard() {
       title: "Thanks for rating!",
       description: `You rated this order ${rating} stars.`,
     });
+  };
+
+  const handleCancelOrder = async (orderId: number) => {
+    try {
+      await api.put(`/api/orders/${orderId}/cancel`);
+      toast({
+        title: 'Order Cancelled',
+        description: 'Your order has been cancelled successfully.',
+      });
+      // Refresh data
+      loadDashboardData();
+    } catch (err: any) {
+      toast({
+        title: 'Cancellation Failed',
+        description: err.response?.data?.message || 'Could not cancel order.',
+        variant: 'destructive',
+      });
+    }
   };
 
   const filteredItems =
@@ -591,6 +655,19 @@ export default function Dashboard() {
                               </p>
                             </div>
                           )}
+
+                          {activeOrder.status === 'ORDERED' && (
+                            <div className="mt-2 flex justify-end">
+                              <Button
+                                variant="destructive"
+                                size="sm"
+                                onClick={() => handleCancelOrder(activeOrder.id)}
+                                className="w-full sm:w-auto"
+                              >
+                                Cancel Order
+                              </Button>
+                            </div>
+                          )}
                         </div>
                       </CardContent>
                     </Card>
@@ -826,6 +903,13 @@ export default function Dashboard() {
                   updateQuantity={updateQuantity}
                   cartTotal={cartTotal}
                   placeOrder={placeOrder}
+                  couponCode={couponCode}
+                  setCouponCode={setCouponCode}
+                  validateCoupon={validateCoupon}
+                  appliedCoupon={appliedCoupon}
+                  removeCoupon={removeCoupon}
+                  discountAmount={discountAmount}
+                  finalTotal={finalTotal}
                 />
               </CardContent>
             </Card>
@@ -866,6 +950,13 @@ export default function Dashboard() {
                   updateQuantity={updateQuantity}
                   cartTotal={cartTotal}
                   placeOrder={placeOrder}
+                  couponCode={couponCode}
+                  setCouponCode={setCouponCode}
+                  validateCoupon={validateCoupon}
+                  appliedCoupon={appliedCoupon}
+                  removeCoupon={removeCoupon}
+                  discountAmount={discountAmount}
+                  finalTotal={finalTotal}
                 />
               </div>
             </SheetContent>
@@ -885,7 +976,20 @@ export default function Dashboard() {
 }
 
 // Extracted Cart Content Component to resolve duplication and nesting issues
-function CartContent({ cart, isProcessingOrder, updateQuantity, cartTotal, placeOrder }: any) {
+function CartContent({
+  cart,
+  isProcessingOrder,
+  updateQuantity,
+  cartTotal,
+  placeOrder,
+  couponCode,
+  setCouponCode,
+  validateCoupon,
+  appliedCoupon,
+  removeCoupon,
+  discountAmount,
+  finalTotal
+}: any) {
   if (cart.length === 0) {
     return (
       <div className="text-center py-12">
@@ -902,7 +1006,7 @@ function CartContent({ cart, isProcessingOrder, updateQuantity, cartTotal, place
     <>
       <div className="space-y-3 max-h-[40vh] overflow-y-auto pr-1">
         {cart.map((item: any) => (
-          <div key={item.menuItem.id} className="flex gap-3 p-3 rounded-xl bg-muted/30 border border-border/50">
+          <div key={item.menuItem.id} className="flex gap-3 p-3 rounded-xl bg-card border border-border/40 hover:border-primary/20 transition-all duration-300 shadow-sm">
             <img
               src={item.menuItem.imageUrl}
               alt={item.menuItem.name}
@@ -918,7 +1022,7 @@ function CartContent({ cart, isProcessingOrder, updateQuantity, cartTotal, place
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="h-6 w-6 rounded-md hover:bg-muted"
+                    className="h-6 w-6 rounded-md hover:bg-muted text-accent"
                     onClick={() => updateQuantity(item.menuItem.id, -1)}
                   >
                     <Minus className="h-3 w-3" />
@@ -927,7 +1031,7 @@ function CartContent({ cart, isProcessingOrder, updateQuantity, cartTotal, place
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="h-6 w-6 rounded-md hover:bg-muted"
+                    className="h-6 w-6 rounded-md hover:bg-muted text-primary"
                     onClick={() => updateQuantity(item.menuItem.id, 1)}
                   >
                     <Plus className="h-3 w-3" />
@@ -940,13 +1044,49 @@ function CartContent({ cart, isProcessingOrder, updateQuantity, cartTotal, place
       </div>
 
       <div className="space-y-3 pt-4 border-t border-border/50">
+
+        {/* Coupon Input */}
+        <div className="flex gap-2">
+          <Input
+            placeholder="Coupon Code"
+            className="h-9"
+            value={couponCode}
+            onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
+            disabled={!!appliedCoupon}
+          />
+          {appliedCoupon ? (
+            <Button variant="destructive" size="sm" onClick={removeCoupon}>
+              <X className="h-4 w-4" />
+            </Button>
+          ) : (
+            <Button size="sm" onClick={validateCoupon} disabled={!couponCode}>
+              Apply
+            </Button>
+          )}
+        </div>
+
+        {appliedCoupon && (
+          <div className="text-xs text-success flex items-center gap-1 font-medium bg-success/10 p-2 rounded-lg">
+            <Ticket className="h-3 w-3" />
+            Coupon "{appliedCoupon.code}" applied! You saved ₹{discountAmount.toFixed(0)}
+          </div>
+        )}
+
         <div className="flex justify-between text-sm">
           <span className="text-muted-foreground">Subtotal</span>
           <span>₹{cartTotal}</span>
         </div>
+
+        {appliedCoupon && (
+          <div className="flex justify-between text-sm text-success font-medium">
+            <span>Discount</span>
+            <span>- ₹{discountAmount.toFixed(0)}</span>
+          </div>
+        )}
+
         <div className="flex justify-between text-lg font-bold text-foreground">
           <span>Total</span>
-          <span>₹{cartTotal}</span>
+          <span>₹{finalTotal.toFixed(0)}</span>
         </div>
         <Button
           className="w-full gradient-primary shadow-soft hover:shadow-glow transition-all py-6 text-lg font-bold text-white relative overflow-hidden"
@@ -962,7 +1102,7 @@ function CartContent({ cart, isProcessingOrder, updateQuantity, cartTotal, place
             <>
               Place Order
               <span className="absolute right-4 top-1/2 -translate-y-1/2 bg-white/20 px-2 py-0.5 rounded text-xs">
-                ₹{cartTotal}
+                ₹{finalTotal.toFixed(0)}
               </span>
             </>
           )}

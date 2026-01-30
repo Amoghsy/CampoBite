@@ -28,6 +28,9 @@ public class Order {
 
     private String itemNames;
 
+    private String couponCode;
+    private Double discountAmount;
+
     @ManyToOne
     private User user;
 

@@ -41,4 +41,36 @@ public class NotificationService {
             e.printStackTrace();
         }
     }
+
+    @Async
+    public void subscribeToTopic(String token, String topic) {
+        try {
+            com.google.firebase.messaging.TopicManagementResponse response = FirebaseMessaging.getInstance()
+                    .subscribeToTopic(java.util.Collections.singletonList(token), topic);
+            System.out.println("✅ Subscribed to topic: " + topic + " | Success: " + response.getSuccessCount());
+        } catch (Exception e) {
+            System.err.println("❌ Failed to subscribe to topic: " + topic);
+            e.printStackTrace();
+        }
+    }
+
+    @Async
+    public void sendTopicNotification(String topic, String title, String body, java.util.Map<String, String> data) {
+        try {
+            Message.Builder messageBuilder = Message.builder()
+                    .setTopic(topic)
+                    .putData("title", title)
+                    .putData("body", body);
+
+            if (data != null) {
+                messageBuilder.putAllData(data);
+            }
+
+            String response = FirebaseMessaging.getInstance().send(messageBuilder.build());
+            System.out.println("🔥 FCM Topic (" + topic + ") Sent: " + response);
+        } catch (Exception e) {
+            System.err.println("❌ FCM Topic Failed: " + topic);
+            e.printStackTrace();
+        }
+    }
 }

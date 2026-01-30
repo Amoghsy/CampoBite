@@ -248,7 +248,13 @@ public class EmailService {
                                     Order Status Breakdown
                                 </h3>
                                 <div style="background-color: white; border: 1px solid #e2e8f0; border-radius: 16px; padding: 5px; margin-bottom: 30px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);">
-                                    <table style="width: 100%%; border-collapse: separate; border-spacing: 0;">
+                                    <table style="width: 100%%; border-collapse: Separate; border-spacing: 0;">
+                                        <thead style="background-color: #f8fafc;">
+                                            <tr>
+                                                <th style="padding: 12px 15px; text-align: left; font-size: 11px; text-transform: uppercase; color: #64748b; border-bottom: 1px solid #e2e8f0; border-top-left-radius: 12px;">Status</th>
+                                                <th style="padding: 12px 15px; text-align: right; font-size: 11px; text-transform: uppercase; color: #64748b; border-bottom: 1px solid #e2e8f0; border-top-right-radius: 12px;">Count</th>
+                                            </tr>
+                                        </thead>
                                         <tbody>
                                             %s
                                         </tbody>

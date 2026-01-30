@@ -11,6 +11,7 @@ public class UserQuery {
     private Long id;
 
     private String userEmail;
+    private String userName;
 
     @Column(columnDefinition = "TEXT")
     private String queryText;
@@ -26,8 +27,9 @@ public class UserQuery {
     public UserQuery() {
     }
 
-    public UserQuery(String userEmail, String queryText) {
+    public UserQuery(String userEmail, String userName, String queryText) {
         this.userEmail = userEmail;
+        this.userName = userName;
         this.queryText = queryText;
     }
 
@@ -45,6 +47,14 @@ public class UserQuery {
 
     public void setUserEmail(String userEmail) {
         this.userEmail = userEmail;
+    }
+
+    public String getUserName() {
+        return userName;
+    }
+
+    public void setUserName(String userName) {
+        this.userName = userName;
     }
 
     public String getQueryText() {

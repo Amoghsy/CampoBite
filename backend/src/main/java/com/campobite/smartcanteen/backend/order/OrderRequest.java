@@ -25,6 +25,17 @@ public class OrderRequest {
         this.items = items;
     }
 
+    /* ===== COUPON ===== */
+    private String couponCode;
+
+    public String getCouponCode() {
+        return couponCode;
+    }
+
+    public void setCouponCode(String couponCode) {
+        this.couponCode = couponCode;
+    }
+
     /* ================= INNER ITEM CLASS ================= */
     public static class Item {
 

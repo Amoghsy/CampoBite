@@ -10,13 +10,16 @@ import java.util.Map;
 public class UserController {
 
     private final UserRepository userRepo;
+    private final com.campobite.smartcanteen.backend.notification.NotificationService notificationService;
 
     private final org.springframework.security.crypto.password.PasswordEncoder passwordEncoder;
 
     public UserController(UserRepository userRepo,
-            org.springframework.security.crypto.password.PasswordEncoder passwordEncoder) {
+            org.springframework.security.crypto.password.PasswordEncoder passwordEncoder,
+            com.campobite.smartcanteen.backend.notification.NotificationService notificationService) {
         this.userRepo = userRepo;
         this.passwordEncoder = passwordEncoder;
+        this.notificationService = notificationService;
     }
 
     /* ================= GET USER PROFILE ================= */
@@ -98,5 +101,13 @@ public class UserController {
 
         user.setFcmToken(token);
         userRepo.save(user);
+
+        // Subscribe to general updates
+        notificationService.subscribeToTopic(token, "coupons");
+
+        // Subscribe to admin updates if admin
+        if ("ADMIN".equalsIgnoreCase(user.getRole())) {
+            notificationService.subscribeToTopic(token, "admin");
+        }
     }
 }

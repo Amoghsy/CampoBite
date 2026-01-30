@@ -34,6 +34,7 @@ public class AdminOrderController {
             map.put("totalAmount", order.getTotalAmount());
             map.put("customerName", order.getUser().getName());
             map.put("createdAt", order.getCreatedAt());
+            map.put("otpExpiry", order.getOtpExpiry());
             map.put("items", order.getItems());
             return map;
         }).toList();
@@ -130,6 +131,37 @@ public class AdminOrderController {
         Order savedOrder = orderRepo.save(order);
 
         return ResponseEntity.ok(savedOrder);
+    }
+
+    @PostMapping("/{orderId}/resend-otp")
+    public ResponseEntity<?> resendOtp(@PathVariable Long orderId) {
+        Order order = orderRepo.findById(orderId)
+                .orElseThrow(() -> new RuntimeException("Order not found"));
+
+        if (!"READY".equals(order.getStatus())) {
+            return ResponseEntity.badRequest().body("Order is not in READY state, cannot resend OTP");
+        }
+
+        // Generate new OTP
+        String otp = String.valueOf((int) (Math.random() * 9000) + 1000);
+        order.setOtp(otp);
+        order.setOtpExpiry(java.time.LocalDateTime.now().plusMinutes(5));
+        orderRepo.save(order);
+
+        // Send Email
+        try {
+            if (order.getUser() != null) {
+                emailService.sendOtpEmail(
+                        order.getUser().getEmail(),
+                        order.getUser().getName(),
+                        order.getTokenNumber(),
+                        otp);
+            }
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body("Failed to send OTP email");
+        }
+
+        return ResponseEntity.ok("OTP resent successfully");
     }
 
 }
