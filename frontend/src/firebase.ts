@@ -41,6 +41,10 @@ export const registerServiceWorker = async () => {
 export const getFcmToken = async () => {
   try {
     if (!firebaseSWRegistration) {
+      await registerServiceWorker();
+    }
+
+    if (!firebaseSWRegistration) {
       throw new Error("Firebase SW not registered yet");
     }
 
