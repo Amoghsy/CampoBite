@@ -19,6 +19,7 @@ export default defineConfig(({ mode }) => ({
       registerType: "prompt",
       injectRegister: false,
       includeAssets: ["favicon.ico"],
+      manifestFilename: "manifest.json",
       manifest: {
         name: "Campobite",
         short_name: "Campobite",
