@@ -1,11 +1,8 @@
 ﻿import { initializeApp } from "firebase/app";
 import { getMessaging, getToken, onMessage } from "firebase/messaging";
 
-/* --------------------------------------------------
-   Firebase Config (FRONTEND ONLY)
--------------------------------------------------- */
 const firebaseConfig = {
- apiKey: "AIzaSyDSfcNspKnmTuRsAzD2JJERxoK4-urvZ-g",
+  apiKey: "AIzaSyDSfcNspKnmTuRsAzD2JJERxoK4-urvZ-g",
   authDomain: "campobite-fc485.firebaseapp.com",
   projectId: "campobite-fc485",
   storageBucket: "campobite-fc485.firebasestorage.app",
@@ -16,85 +13,66 @@ const firebaseConfig = {
 
 console.log("[FCM] Firebase config loaded");
 
-/* --------------------------------------------------
-   Initialize Firebase
--------------------------------------------------- */
 const app = initializeApp(firebaseConfig);
 console.log("[FCM] Firebase initialized");
 
 const messaging = getMessaging(app);
 console.log("[FCM] Messaging initialized");
 
-/* --------------------------------------------------
-   Register Service Worker (REQUIRED)
--------------------------------------------------- */
+let firebaseSWRegistration: ServiceWorkerRegistration | null = null;
+
+/* ---------------- SERVICE WORKER ---------------- */
 export const registerServiceWorker = async () => {
-  if ("serviceWorker" in navigator) {
-    try {
-      const registration = await navigator.serviceWorker.register(
-        "/firebase-messaging-sw.js"
-      );
-      console.log("[FCM] Service Worker registered:", registration);
-      return registration;
-    } catch (error) {
-      console.error("[FCM] Service Worker registration failed:", error);
-    }
-  }
+  if (!("serviceWorker" in navigator)) return null;
+
+  firebaseSWRegistration = await navigator.serviceWorker.register(
+    "/firebase-messaging-sw.js",
+    { scope: "/" }
+  );
+
+  console.log("[FCM] Firebase SW registered:", firebaseSWRegistration);
+  await navigator.serviceWorker.ready;
+  console.log("[FCM] Firebase SW ready");
+
+  return firebaseSWRegistration;
 };
 
-/* --------------------------------------------------
-   Get FCM Token
--------------------------------------------------- */
+/* ---------------- TOKEN ---------------- */
 export const getFcmToken = async () => {
   try {
-    console.log("[FCM] Requesting notification permission");
+    if (!firebaseSWRegistration) {
+      throw new Error("Firebase SW not registered yet");
+    }
 
     const permission = await Notification.requestPermission();
     console.log("[FCM] Notification permission:", permission);
 
-    if (permission !== "granted") {
-      console.warn("[FCM] Permission not granted");
-      return null;
-    }
+    if (permission !== "granted") return null;
 
     const token = await getToken(messaging, {
       vapidKey: import.meta.env.VITE_FIREBASE_VAPID_KEY,
-      serviceWorkerRegistration:
-        await navigator.serviceWorker.ready,
+      serviceWorkerRegistration: firebaseSWRegistration,
     });
 
-    console.log("[FCM] FCM Token generated:", token);
+    console.log("[FCM] FINAL FCM TOKEN:", token);
     return token;
-  } catch (error) {
-    console.error("[FCM] Error while getting token:", error);
+  } catch (err) {
+    console.error("[FCM] Token error:", err);
     return null;
   }
 };
 
-/* --------------------------------------------------
-   Foreground Message Listener
--------------------------------------------------- */
+/* ---------------- FOREGROUND ---------------- */
 export const listenNotifications = () => {
   onMessage(messaging, (payload) => {
-    console.log("[FCM] Foreground message received:", payload);
+    console.log("[FCM] Foreground message:", payload);
 
-    if (payload?.notification) {
-      new Notification(payload.notification.title ?? "New Notification", {
-        body: payload.notification.body,
-        icon: "/logo.png",
-      });
-    }
-  });
-};
+    const title = payload.data?.title ?? "CampoBite";
+    const body = payload.data?.body ?? "New update";
 
-/* --------------------------------------------------
-   Custom Listener (optional)
--------------------------------------------------- */
-export const onMessageListener = (
-  callback: (payload: any) => void
-) => {
-  return onMessage(messaging, (payload) => {
-    console.log("[FCM] onMessageListener payload:", payload);
-    callback(payload);
+    new Notification(title, {
+      body,
+      icon: "/logo.png",
+    });
   });
 };
