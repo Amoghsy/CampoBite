@@ -1,16 +1,23 @@
 package com.campobite.smartcanteen.backend.notification;
 
-import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestTemplate;
+
+import java.util.HashMap;
+import java.util.Map;
 
 @Service
 public class EmailService {
 
-    private final JavaMailSender mailSender;
+    private final RestTemplate restTemplate;
 
-    public EmailService(JavaMailSender mailSender) {
-        this.mailSender = mailSender;
+    @Value("${google.script.url}")
+    private String scriptUrl;
+
+    public EmailService(RestTemplate restTemplate) {
+        this.restTemplate = restTemplate;
     }
 
     @Async
@@ -21,14 +28,6 @@ public class EmailService {
             double totalAmount,
             java.util.List<com.campobite.smartcanteen.backend.order.OrderItem> items) {
         try {
-            jakarta.mail.internet.MimeMessage message = mailSender.createMimeMessage();
-            org.springframework.mail.javamail.MimeMessageHelper helper = new org.springframework.mail.javamail.MimeMessageHelper(
-                    message, true, "UTF-8");
-
-            helper.setTo(toEmail);
-            helper.setFrom("amoghsys891@gmail.com");
-            helper.setSubject("🍽️ CampoBite Order Confirmed #" + tokenNumber);
-
             StringBuilder itemsHtml = new StringBuilder();
             for (com.campobite.smartcanteen.backend.order.OrderItem item : items) {
                 itemsHtml.append("<tr>")
@@ -94,24 +93,23 @@ public class EmailService {
                     """
                     .formatted(customerName, tokenNumber, itemsHtml.toString(), totalAmount);
 
-            helper.setText(htmlContent, true);
-            mailSender.send(message);
+            Map<String, Object> payload = new HashMap<>();
+            payload.put("recipient", toEmail);
+            payload.put("subject", "🍽️ CampoBite Order Confirmed #" + tokenNumber);
+            payload.put("body", htmlContent);
+
+            restTemplate.postForLocation(scriptUrl, payload);
+            System.out.println("✅ Email sent via HTTP to: " + toEmail);
+
         } catch (Exception e) {
-            e.printStackTrace(); // Log error but don't stop flow
+            System.err.println("❌ Failed to send email via HTTP: " + e.getMessage());
+            e.printStackTrace();
         }
     }
 
     @Async
     public void sendQueryReply(String toEmail, String query, String reply) {
         try {
-            jakarta.mail.internet.MimeMessage message = mailSender.createMimeMessage();
-            org.springframework.mail.javamail.MimeMessageHelper helper = new org.springframework.mail.javamail.MimeMessageHelper(
-                    message, true, "UTF-8");
-
-            helper.setTo(toEmail);
-            helper.setFrom("amoghsys891@gmail.com");
-            helper.setSubject("Re: Your Query - CampoBite");
-
             String htmlContent = """
                     <html>
                     <body style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #333; background-color: #f4f6f8;">
@@ -137,9 +135,16 @@ public class EmailService {
                     """
                     .formatted(query, reply);
 
-            helper.setText(htmlContent, true);
-            mailSender.send(message);
+            Map<String, Object> payload = new HashMap<>();
+            payload.put("recipient", toEmail);
+            payload.put("subject", "Re: Your Query - CampoBite");
+            payload.put("body", htmlContent);
+
+            restTemplate.postForLocation(scriptUrl, payload);
+            System.out.println("✅ Query reply email sent via HTTP to: " + toEmail);
+
         } catch (Exception e) {
+            System.err.println("❌ Failed to send query reply email via HTTP: " + e.getMessage());
             e.printStackTrace();
         }
     }
