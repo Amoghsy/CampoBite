@@ -395,17 +395,17 @@ export default function Dashboard() {
     <div className="min-h-screen bg-background">
       {/* HEADER */}
       <header className="sticky top-0 z-50 border-b border-border/50 bg-background/95 backdrop-blur-lg">
-        <div className="container flex h-16 items-center justify-between">
+        <div className="container flex h-16 items-center justify-between px-4 sm:px-6">
           <Link to="/" className="flex items-center gap-2.5">
-            <div className="h-10 w-10 rounded-xl gradient-primary flex items-center justify-center shadow-soft">
-              <Utensils className="h-5 w-5 text-white" />
+            <div className="h-9 w-9 sm:h-10 sm:w-10 rounded-xl gradient-primary flex items-center justify-center shadow-soft">
+              <Utensils className="h-4 w-4 sm:h-5 sm:w-5 text-white" />
             </div>
-            <span className="text-xl font-bold">
+            <span className="text-lg sm:text-xl font-bold">
               Campo<span className="text-accent">Bite</span>
             </span>
           </Link>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3">
 
 
             {/* Notification Bell */}
@@ -504,10 +504,10 @@ export default function Dashboard() {
         </div>
       </header>
 
-      <div className="container py-8">
-        <div className="grid lg:grid-cols-3 gap-8">
+      <div className="container py-4 sm:py-8 px-4 sm:px-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8">
           {/* Main Content */}
-          <div className="lg:col-span-2 space-y-8">
+          <div className="order-1 lg:order-none lg:col-span-2 space-y-6 sm:space-y-8">
             {/* Welcome Section */}
             <div className="space-y-2">
               <h1 className="text-3xl font-bold text-foreground">Welcome back, {user?.name?.split(' ')[0]}! 👋</h1>
@@ -618,11 +618,11 @@ export default function Dashboard() {
 
             {/* Tabs */}
             <Tabs defaultValue="menu" className="space-y-6">
-              <TabsList className="bg-muted/20 p-1 w-full justify-start">
-                <TabsTrigger value="menu" className="flex-1 md:flex-none data-[state=active]:gradient-primary data-[state=active]:text-white">
+              <TabsList className="bg-muted/20 p-1 w-full justify-start overflow-x-auto">
+                <TabsTrigger value="menu" className="flex-1 min-w-[100px] md:flex-none data-[state=active]:gradient-primary data-[state=active]:text-white">
                   Menu
                 </TabsTrigger>
-                <TabsTrigger value="history" className="flex-1 md:flex-none data-[state=active]:gradient-primary data-[state=active]:text-white">
+                <TabsTrigger value="history" className="flex-1 min-w-[120px] md:flex-none data-[state=active]:gradient-primary data-[state=active]:text-white">
                   Order History
                 </TabsTrigger>
               </TabsList>
@@ -782,11 +782,11 @@ export default function Dashboard() {
           </div>
 
           {/* Cart Sidebar */}
-          <div className="lg:col-span-1" id="cart-section">
-            <Card className="sticky top-24 shadow-card border-border/50">
-              <CardHeader className="pb-4 border-b border-border/50">
-                <CardTitle className="flex items-center gap-2">
-                  <div className="h-8 w-8 rounded-lg gradient-primary flex items-center justify-center shadow-soft">
+          <div className="lg:col-span-1 order-last lg:order-none" id="cart-section">
+            <Card className="sticky top-20 sm:top-24 shadow-card border-border/50">
+              <CardHeader className="pb-3 sm:pb-4 border-b border-border/50">
+                <CardTitle className="flex items-center gap-2 text-lg sm:text-xl">
+                  <div className="h-7 w-7 sm:h-8 sm:w-8 rounded-lg gradient-primary flex items-center justify-center shadow-soft">
                     <ShoppingCart className="h-4 w-4 text-white" />
                   </div>
                   Your Cart
@@ -795,7 +795,7 @@ export default function Dashboard() {
                   )}
                 </CardTitle>
               </CardHeader>
-              <CardContent className="p-5 space-y-4">
+              <CardContent className="p-4 sm:p-5 space-y-4">
                 {cart.length === 0 ? (
                   <div className="text-center py-12">
                     <div className="h-16 w-16 mx-auto mb-4 rounded-2xl bg-muted/50 flex items-center justify-center">

@@ -312,19 +312,22 @@ export default function Admin() {
           </div>
           <div className="flex gap-3">
             <Link to="/admin/menu">
-              <Button variant="outline">
+              <Button variant="outline" size="sm" className="hidden sm:inline-flex">
                 <Utensils className="h-4 w-4 mr-2" />
                 Manage Menu
+              </Button>
+              <Button variant="outline" size="icon" className="sm:hidden">
+                <Utensils className="h-4 w-4" />
               </Button>
             </Link>
             <Dialog open={showAnalytics} onOpenChange={setShowAnalytics}>
               <DialogTrigger asChild>
-                <Button className="gradient-primary">
-                  <BarChart3 className="h-4 w-4 mr-2" />
-                  View Analytics
+                <Button className="gradient-primary" size="sm">
+                  <BarChart3 className="h-4 w-4 sm:mr-2" />
+                  <span className="hidden sm:inline">View Analytics</span>
                 </Button>
               </DialogTrigger>
-              <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
+              <DialogContent className="max-w-[95vw] sm:max-w-5xl max-h-[90vh] overflow-y-auto w-full p-4 sm:p-6">
                 <DialogHeader>
                   <DialogTitle>Advanced Analytics</DialogTitle>
                 </DialogHeader>
@@ -583,7 +586,7 @@ export default function Admin() {
             )}
 
             <Dialog open={showAllFeedbacks} onOpenChange={setShowAllFeedbacks}>
-              <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+              <DialogContent className="max-w-[95vw] sm:max-w-4xl max-h-[85vh] overflow-y-auto w-full p-4 sm:p-6">
                 <DialogHeader>
                   <DialogTitle>All Customer Feedback</DialogTitle>
                 </DialogHeader>
@@ -708,7 +711,7 @@ export default function Admin() {
             )}
             {/* All Queries Dialog */}
             <Dialog open={showAllQueries} onOpenChange={setShowAllQueries}>
-              <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+              <DialogContent className="max-w-[95vw] sm:max-w-4xl max-h-[85vh] overflow-y-auto w-full p-4 sm:p-6">
                 <DialogHeader>
                   <DialogTitle>All User Queries</DialogTitle>
                 </DialogHeader>
@@ -746,7 +749,7 @@ export default function Admin() {
             <Dialog open={replyQueryId !== null} onOpenChange={(open) => {
               if (!open) setReplyQueryId(null);
             }}>
-              <DialogContent>
+              <DialogContent className="max-w-[95vw] sm:max-w-lg w-full p-4 sm:p-6">
                 <DialogHeader>
                   <DialogTitle>Reply to Query</DialogTitle>
                 </DialogHeader>
@@ -855,34 +858,30 @@ export default function Admin() {
 
 /* ================= REUSABLE ================= */
 
-function StatCard({ title, value, icon: Icon }: any) {
+function StatCard({ title, value, icon: Icon }: { title: string; value: string | number; icon: any }) {
   return (
-    <Card>
-      <CardContent className="p-6 flex justify-between">
-        <div>
-          <p className="text-sm text-muted-foreground">{title}</p>
-          <p className="text-2xl font-bold">{value}</p>
-        </div>
-        <div className="h-12 w-12 rounded-xl gradient-primary flex items-center justify-center">
-          <Icon className="h-6 w-6 text-white" />
-        </div>
-      </CardContent>
-    </Card>
+    <div className={`p-4 rounded-2xl flex items-center gap-4 shadow-sm border ${title === 'Today\'s Revenue' ? 'bg-primary/5 border-primary/20' : 'bg-card border-border/50'}`}>
+      <div className={`h-10 w-10 sm:h-12 sm:w-12 rounded-xl flex items-center justify-center shrink-0 ${title === 'Today\'s Revenue' ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'}`}>
+        <Icon className="h-5 w-5 sm:h-6 sm:w-6" />
+      </div>
+      <div>
+        <p className="text-xs sm:text-sm text-muted-foreground font-medium">{title}</p>
+        <h3 className="text-lg sm:text-2xl font-bold tracking-tight">{value}</h3>
+      </div>
+    </div>
   );
 }
 
-function QuickStat({ title, value, icon: Icon }: any) {
+function QuickStat({ title, value, icon: Icon }: { title: string; value: string | number; icon: any }) {
   return (
-    <Card>
-      <CardContent className="p-4 flex items-center gap-4">
-        <div className="h-12 w-12 rounded-xl bg-muted flex items-center justify-center">
-          <Icon className="h-6 w-6" />
-        </div>
-        <div>
-          <p className="text-sm text-muted-foreground">{title}</p>
-          <p className="text-2xl font-bold">{value}</p>
-        </div>
-      </CardContent>
-    </Card>
+    <div className="p-3 sm:p-4 rounded-xl bg-muted/30 border border-border/50 flex items-center justify-between hover:bg-muted/50 transition-colors">
+      <div>
+        <p className="text-[10px] sm:text-xs text-muted-foreground font-medium uppercase tracking-wider">{title}</p>
+        <p className="text-base sm:text-lg font-bold mt-0.5">{value}</p>
+      </div>
+      <div className="h-7 w-7 sm:h-8 sm:w-8 rounded-lg bg-background flex items-center justify-center border border-border/50">
+        <Icon className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground" />
+      </div>
+    </div>
   );
 }
