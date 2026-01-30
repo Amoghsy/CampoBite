@@ -23,6 +23,9 @@ public class Order {
     private String status;
     private Integer totalAmount;
 
+    private String otp;
+    private LocalDateTime otpExpiry;
+
     private String itemNames;
 
     @ManyToOne

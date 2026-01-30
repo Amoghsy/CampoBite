@@ -1,23 +1,16 @@
 package com.campobite.smartcanteen.backend.notification;
 
-import org.springframework.beans.factory.annotation.Value;
+import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
-import org.springframework.web.client.RestTemplate;
-
-import java.util.HashMap;
-import java.util.Map;
 
 @Service
 public class EmailService {
 
-    private final RestTemplate restTemplate;
+    private final JavaMailSender mailSender;
 
-    @Value("${google.script.url}")
-    private String scriptUrl;
-
-    public EmailService(RestTemplate restTemplate) {
-        this.restTemplate = restTemplate;
+    public EmailService(JavaMailSender mailSender) {
+        this.mailSender = mailSender;
     }
 
     @Async
@@ -28,6 +21,14 @@ public class EmailService {
             double totalAmount,
             java.util.List<com.campobite.smartcanteen.backend.order.OrderItem> items) {
         try {
+            jakarta.mail.internet.MimeMessage message = mailSender.createMimeMessage();
+            org.springframework.mail.javamail.MimeMessageHelper helper = new org.springframework.mail.javamail.MimeMessageHelper(
+                    message, true, "UTF-8");
+
+            helper.setTo(toEmail);
+            helper.setFrom("amoghsys891@gmail.com");
+            helper.setSubject("🍽️ CampoBite Order Confirmed #" + tokenNumber);
+
             StringBuilder itemsHtml = new StringBuilder();
             for (com.campobite.smartcanteen.backend.order.OrderItem item : items) {
                 itemsHtml.append("<tr>")
@@ -93,23 +94,24 @@ public class EmailService {
                     """
                     .formatted(customerName, tokenNumber, itemsHtml.toString(), totalAmount);
 
-            Map<String, Object> payload = new HashMap<>();
-            payload.put("recipient", toEmail);
-            payload.put("subject", "🍽️ CampoBite Order Confirmed #" + tokenNumber);
-            payload.put("body", htmlContent);
-
-            restTemplate.postForLocation(scriptUrl, payload);
-            System.out.println("✅ Email sent via HTTP to: " + toEmail);
-
+            helper.setText(htmlContent, true);
+            mailSender.send(message);
         } catch (Exception e) {
-            System.err.println("❌ Failed to send email via HTTP: " + e.getMessage());
-            e.printStackTrace();
+            e.printStackTrace(); // Log error but don't stop flow
         }
     }
 
     @Async
     public void sendQueryReply(String toEmail, String query, String reply) {
         try {
+            jakarta.mail.internet.MimeMessage message = mailSender.createMimeMessage();
+            org.springframework.mail.javamail.MimeMessageHelper helper = new org.springframework.mail.javamail.MimeMessageHelper(
+                    message, true, "UTF-8");
+
+            helper.setTo(toEmail);
+            helper.setFrom("amoghsys891@gmail.com");
+            helper.setSubject("Re: Your Query - CampoBite");
+
             String htmlContent = """
                     <html>
                     <body style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #333; background-color: #f4f6f8;">
@@ -135,17 +137,54 @@ public class EmailService {
                     """
                     .formatted(query, reply);
 
-            Map<String, Object> payload = new HashMap<>();
-            payload.put("recipient", toEmail);
-            payload.put("subject", "Re: Your Query - CampoBite");
-            payload.put("body", htmlContent);
-
-            restTemplate.postForLocation(scriptUrl, payload);
-            System.out.println("✅ Query reply email sent via HTTP to: " + toEmail);
-
+            helper.setText(htmlContent, true);
+            mailSender.send(message);
         } catch (Exception e) {
-            System.err.println("❌ Failed to send query reply email via HTTP: " + e.getMessage());
             e.printStackTrace();
         }
     }
+
+    @Async
+    public void sendOtpEmail(String toEmail, String name, int tokenNumber, String otp) {
+        try {
+            jakarta.mail.internet.MimeMessage message = mailSender.createMimeMessage();
+            org.springframework.mail.javamail.MimeMessageHelper helper = new org.springframework.mail.javamail.MimeMessageHelper(
+                    message, true, "UTF-8");
+
+            helper.setTo(toEmail);
+            helper.setFrom("amoghsys891@gmail.com");
+            helper.setSubject("🔐 Order Pickup OTP - CampoBite");
+
+            String htmlContent = """
+                    <html>
+                    <body style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #333; background-color: #f4f6f8;">
+                        <div style="max-width: 600px; margin: 20px auto; background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.08);">
+                            <div style="background: linear-gradient(135deg, #27b08b 0%%, #13907b 100%%); padding: 30px 20px; text-align: center; color: white;">
+                                <h1 style="margin: 0; font-size: 24px;">Order Ready for Pickup!</h1>
+                            </div>
+                            <div style="padding: 30px; text-align: center;">
+                                <p>Hi <strong>%s</strong>,</p>
+                                <p>Your order #%d is ready! Please show this OTP at the counter to collect your food.</p>
+
+                                <div style="background-color: #eafcf6; border: 1px solid #c9eee5; border-radius: 12px; padding: 20px; margin: 25px 0;">
+                                    <h2 style="margin: 0; color: #13907b; font-size: 14px; text-transform: uppercase;">Your OTP</h2>
+                                    <h1 style="margin: 10px 0; color: #27b08b; font-size: 48px; letter-spacing: 5px; font-weight: 800;">%s</h1>
+                                    <p style="margin: 0; font-size: 12px; color: #cc5555;">Valid for 5 minutes only</p>
+                                </div>
+
+                                <p style="font-size: 12px; color: #999;">Do not share this OTP with anyone else.</p>
+                            </div>
+                        </div>
+                    </body>
+                    </html>
+                    """
+                    .formatted(name, tokenNumber, otp);
+
+            helper.setText(htmlContent, true);
+            mailSender.send(message);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
 }

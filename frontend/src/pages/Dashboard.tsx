@@ -63,6 +63,7 @@ interface BackendOrder {
   totalAmount: number;
   createdAt: string;
   itemNames?: string;
+  otp?: string;
 }
 
 /* ================= CONSTANTS ================= */
@@ -569,6 +570,27 @@ export default function Dashboard() {
                           <div className="w-full pb-2">
                             <OrderStatusProgress status={activeOrder.status} />
                           </div>
+
+                          {/* OTP Display */}
+                          {activeOrder.status === 'READY' && activeOrder.otp && (
+                            <div className="mt-2 p-4 bg-emerald-50 border-2 border-dashed border-emerald-200 rounded-xl text-center relative overflow-hidden group">
+                              <div className="absolute inset-0 bg-emerald-100/20 group-hover:bg-emerald-100/40 transition-colors" />
+                              <p className="text-xs font-bold text-emerald-800 uppercase tracking-widest mb-1 relative z-10">
+                                Pickup Verification Code
+                              </p>
+                              <div className="flex items-center justify-center gap-3 relative z-10">
+                                {activeOrder.otp.split('').map((digit, i) => (
+                                  <span key={i} className="w-10 h-10 flex items-center justify-center bg-white rounded-lg shadow-sm border border-emerald-100 text-2xl font-black text-emerald-600 font-mono">
+                                    {digit}
+                                  </span>
+                                ))}
+                              </div>
+                              <p className="text-[10px] font-medium text-emerald-600 mt-2 relative z-10 flex items-center justify-center gap-1">
+                                <Clock className="h-3 w-3" />
+                                Valid for 5 minutes
+                              </p>
+                            </div>
+                          )}
                         </div>
                       </CardContent>
                     </Card>

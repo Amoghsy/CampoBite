@@ -138,7 +138,13 @@ export default function Admin() {
   const [replyQueryId, setReplyQueryId] = useState<number | null>(null);
   const [replyText, setReplyText] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+
   const [timeRange, setTimeRange] = useState('weekly');
+
+  // OTP Verification State
+  const [showOtpDialog, setShowOtpDialog] = useState(false);
+  const [selectedOrderId, setSelectedOrderId] = useState<number | null>(null);
+  const [verificationOtp, setVerificationOtp] = useState('');
 
   /* ================= AUTH GUARD ================= */
 
@@ -250,6 +256,15 @@ export default function Admin() {
   /* ================= UPDATE ORDER STATUS ================= */
 
   const updateOrderStatus = async (id: number, status: OrderStatus) => {
+    // If Admin tries to complete a READY order, show OTP dialog first
+    const order = orders.find(o => o.id === id);
+    if (status === 'COMPLETED' && order?.status === 'READY') {
+      setSelectedOrderId(id);
+      setVerificationOtp('');
+      setShowOtpDialog(true);
+      return;
+    }
+
     try {
       await api.put(`/api/admin/orders/${id}/status`, { status });
       toast({
@@ -262,6 +277,27 @@ export default function Admin() {
       toast({
         title: 'Update failed',
         variant: 'destructive',
+      });
+    }
+  };
+
+  const verifyOrderOtp = async () => {
+    if (!selectedOrderId || !verificationOtp) return;
+
+    try {
+      await api.post(`/api/admin/orders/${selectedOrderId}/complete`, { otp: verificationOtp });
+      toast({
+        title: 'Order Completed',
+        description: 'OTP verified successfully!',
+      });
+      setShowOtpDialog(false);
+      loadOrders();
+      loadStats();
+    } catch (err: any) {
+      toast({
+        title: 'Verification Failed',
+        description: err.response?.data || 'Invalid OTP',
+        variant: 'destructive'
       });
     }
   };
@@ -775,6 +811,39 @@ export default function Admin() {
           </CardContent>
         </Card>
 
+
+
+        {/* OTP VERIFICATION DIALOG */}
+        <Dialog open={showOtpDialog} onOpenChange={setShowOtpDialog}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>Verify Order Pickup</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <p className="text-sm text-muted-foreground">
+                Ask the customer for the OTP displayed on their dashboard or email.
+              </p>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Enter 4-Digit OTP</label>
+                <Input
+                  value={verificationOtp}
+                  onChange={(e) => setVerificationOtp(e.target.value)}
+                  placeholder="e.g. 1234"
+                  maxLength={4}
+                  className="text-center text-lg tracking-widest"
+                />
+              </div>
+              <Button
+                className="w-full gradient-primary"
+                onClick={verifyOrderOtp}
+                disabled={verificationOtp.length < 4}
+              >
+                Verify & Complete Order
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+
         {/* LIVE ORDERS */}
         <Card>
           <CardHeader>
@@ -852,7 +921,7 @@ export default function Admin() {
 
 
       </div>
-    </div>
+    </div >
   );
 }
 
