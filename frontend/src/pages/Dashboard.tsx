@@ -31,6 +31,13 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { getFcmToken } from '@/firebase';
 import { listenNotifications } from '@/firebase';
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
 
 /* ================= TYPES ================= */
 
@@ -135,7 +142,7 @@ export default function Dashboard() {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [activeCategory, setActiveCategory] = useState<'all' | MenuItem['category']>('all');
   const [user, setUser] = useState<{ name: string; email: string; role?: string; usn?: string } | null>(null);
-  const [activeOrder, setActiveOrder] = useState<BackendOrder | null>(null);
+  const [activeOrders, setActiveOrders] = useState<BackendOrder[]>([]);
   const [orderHistory, setOrderHistory] = useState<BackendOrder[]>([]);
   const [recommendedItems, setRecommendedItems] = useState<MenuItem[]>([]);
   // Local state for UI order ratings
@@ -174,7 +181,7 @@ export default function Dashboard() {
           return;
         }
         setUser(res.data.user);
-        setActiveOrder(res.data.activeOrder);
+        setActiveOrders(res.data.activeOrders || (res.data.activeOrder ? [res.data.activeOrder] : []));
         setOrderHistory(res.data.orderHistory);
       })
       .catch((err) => {
@@ -282,10 +289,10 @@ export default function Dashboard() {
           setLastOrderId(res.data.id);
 
           setCart([]);
-          setActiveOrder(res.data);
+          // Add new order to activeOrders immediately
+          setActiveOrders(prev => [res.data, ...prev]);
 
-          // Feedback modal will be triggered by the useEffect observing activeOrder
-
+          // Feedback modal will be triggered by the useEffect observing activeOrders logic
 
         } catch (err) {
           console.error("ORDER ERROR:", err);
@@ -356,38 +363,34 @@ export default function Dashboard() {
     listenNotifications();
   }, []);
 
-  // Monitor activeOrder and history for completion to show feedback modal
+  // Monitor activeOrders and history for completion to show feedback modal
   useEffect(() => {
-    // Check activeOrder first
-    let targetOrder = activeOrder;
+    // If we have active orders, we don't necessarily show feedback for them yet unless one JUST finished.
+    // Ideally backend tells us "this order just finished".
+    // But here we rely on checking if an order IS NOT in activeOrders BUT IS in history and we haven't shown feedback yet.
+    // Or simpler: check history. If latest is completed and not shown, show it.
 
-    // If activeOrder is null or not completed, check the most recent order from history
-    if ((!targetOrder || targetOrder.status !== 'COMPLETED') && orderHistory.length > 0) {
-      // Assuming orderHistory is sorted latest first, or we take the one with highest ID
-      // backend usually sends sorted, but let's be safe and just take the first one if we assume it's sorted,
-      // or simply find the one with max ID.
-      const latestHistoryOrder = orderHistory[0]; // expecting sorted for now
+    // Check the most recent order from history
+    if (orderHistory.length > 0) {
+      const latestHistoryOrder = orderHistory[0]; // expecting sorted (latest first)
+
       if (latestHistoryOrder.status === 'COMPLETED') {
-        targetOrder = latestHistoryOrder;
+        // Check if we already showed feedback for this order
+        if (!shownFeedbackForOrderIds.includes(latestHistoryOrder.id)) {
+          setLastOrderToken(latestHistoryOrder.tokenNumber.toString());
+          const items = latestHistoryOrder.itemNames ? latestHistoryOrder.itemNames.split(', ') : [];
+          setLastOrderItems(items);
+          setLastOrderId(latestHistoryOrder.id);
+          setShowFeedbackModal(true);
+
+          // Mark as shown so we don't pop it up again for this session or future sessions
+          const newShownIds = [...shownFeedbackForOrderIds, latestHistoryOrder.id];
+          setShownFeedbackForOrderIds(newShownIds);
+          localStorage.setItem('shownFeedbackForOrderIds', JSON.stringify(newShownIds));
+        }
       }
     }
-
-    if (targetOrder && targetOrder.status === 'COMPLETED') {
-      // Check if we already showed feedback for this order
-      if (!shownFeedbackForOrderIds.includes(targetOrder.id)) {
-        setLastOrderToken(targetOrder.tokenNumber.toString());
-        const items = targetOrder.itemNames ? targetOrder.itemNames.split(', ') : [];
-        setLastOrderItems(items);
-        setLastOrderId(targetOrder.id);
-        setShowFeedbackModal(true);
-
-        // Mark as shown so we don't pop it up again for this session or future sessions
-        const newShownIds = [...shownFeedbackForOrderIds, targetOrder.id];
-        setShownFeedbackForOrderIds(newShownIds);
-        localStorage.setItem('shownFeedbackForOrderIds', JSON.stringify(newShownIds));
-      }
-    }
-  }, [activeOrder, orderHistory, shownFeedbackForOrderIds]);
+  }, [activeOrders, orderHistory, shownFeedbackForOrderIds]);
 
   /* ================= RENDER ================= */
 
@@ -413,7 +416,7 @@ export default function Dashboard() {
               <PopoverTrigger asChild>
                 <Button variant="ghost" size="icon" className="relative text-muted-foreground hover:text-foreground">
                   <Bell className="h-5 w-5" />
-                  {activeOrder && activeOrder.status !== 'COMPLETED' && (
+                  {activeOrders.length > 0 && (
                     <span className="absolute top-2 right-2 h-2 w-2 rounded-full bg-red-500 animate-pulse" />
                   )}
                 </Button>
@@ -428,33 +431,26 @@ export default function Dashboard() {
                   </CardHeader>
                   <CardContent className="p-0">
                     {/* Active Order Section */}
-                    {activeOrder && activeOrder.status !== 'COMPLETED' ? (
-                      <div className="p-4 bg-muted/30 border-b">
-                        <div className="flex justify-between items-start mb-2">
-                          <span className="text-sm font-semibold text-primary">Active Order #{activeOrder.tokenNumber}</span>
-                          <Badge className={`
-                                ${activeOrder.status === 'READY' ? 'bg-success text-success-foreground' : 'bg-accent text-accent-foreground'} 
-                            `}>
-                            {activeOrder.status}
-                          </Badge>
+                    {activeOrders.length > 0 ? (
+                      <div className="max-h-[250px] overflow-y-auto">
+                        <div className="p-2 bg-muted/10 text-xs font-semibold text-muted-foreground px-4 border-b">
+                          Active Orders
                         </div>
-                        <p className="text-xs text-muted-foreground mb-3">
-                          {activeOrder.itemNames || 'Your delicious food'}
-                        </p>
-                        <div className="w-full h-1.5 bg-muted rounded-full overflow-hidden">
-                          <div
-                            className="h-full bg-primary transition-all duration-500"
-                            style={{
-                              width: activeOrder.status === 'ORDERED' ? '33%' :
-                                activeOrder.status === 'PREPARING' ? '66%' : '100%'
-                            }}
-                          />
-                        </div>
-                        <p className="text-[10px] text-right mt-1 text-muted-foreground">
-                          {activeOrder.status === 'ORDERED' ? 'Order Sent' :
-                            activeOrder.status === 'PREPARING' ? 'Kitchen is preparing' :
-                              'Ready to pick up!'}
-                        </p>
+                        {activeOrders.map(order => (
+                          <div key={order.id} className="p-4 bg-muted/30 border-b last:border-b-0">
+                            <div className="flex justify-between items-start mb-2">
+                              <span className="text-sm font-semibold text-primary">Order #{order.tokenNumber}</span>
+                              <Badge className={`
+                                    ${order.status === 'READY' ? 'bg-success text-success-foreground' : 'bg-accent text-accent-foreground'} 
+                                `}>
+                                {order.status}
+                              </Badge>
+                            </div>
+                            <p className="text-xs text-muted-foreground mb-3 truncate">
+                              {order.itemNames || 'Your delicious food'}
+                            </p>
+                          </div>
+                        ))}
                       </div>
                     ) : (
                       <div className="p-4 text-center text-sm text-muted-foreground border-b">
@@ -464,7 +460,7 @@ export default function Dashboard() {
 
                     {/* Recent History Section */}
                     {orderHistory.length > 0 && (
-                      <div className="max-h-[200px] overflow-y-auto">
+                      <div className="max-h-[200px] overflow-y-auto border-t">
                         <div className="p-2 bg-muted/10 text-xs font-semibold text-muted-foreground px-4">
                           Recent Completed
                         </div>
@@ -514,7 +510,6 @@ export default function Dashboard() {
               <p className="text-muted-foreground">Ready to order your favorite campus food?</p>
             </div>
 
-            {/* Active Order Card */}
             {/* USN Alert for Students */}
             {user?.role && user.role.toLowerCase() === 'student' && (!user.usn || user.usn.trim() === '') && (
               <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-4 flex items-center justify-between animate-in slide-in-from-top-2">
@@ -535,44 +530,51 @@ export default function Dashboard() {
               </div>
             )}
 
-            {/* Active Order Card */}
-            {activeOrder && (
-              <Card className="relative overflow-hidden border-2 border-primary/20 bg-gradient-to-br from-primary/5 via-background to-accent/5 shadow-card">
-                <div className="absolute top-0 left-0 w-full h-1 gradient-primary" />
-                <CardContent className="p-6 sm:p-8">
-                  <div className="flex flex-col gap-8">
-                    {/* Order Header */}
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                      <div className="flex items-center gap-4">
-                        <div className="token-badge text-xl shadow-glow">
-                          #{activeOrder.tokenNumber}
-                        </div>
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <p className="font-bold text-lg text-foreground">Active Order</p>
-                            <Badge className="bg-orange-100 text-orange-600 border-orange-200">
-                              {activeOrder.status}
-                            </Badge>
+            {/* Active Orders Section */}
+            {activeOrders.length > 0 && (
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold flex items-center gap-2">
+                  <Clock className="h-5 w-5 text-accent" />
+                  Active Orders
+                </h3>
+                <div className="grid gap-6">
+                  {activeOrders.map(activeOrder => (
+                    <Card key={activeOrder.id} className="relative overflow-hidden border-2 border-primary/20 bg-gradient-to-br from-primary/5 via-background to-accent/5 shadow-card animate-in fade-in slide-in-from-bottom-2">
+                      <div className="absolute top-0 left-0 w-full h-1 gradient-primary" />
+                      <CardContent className="p-6 sm:p-8">
+                        <div className="flex flex-col gap-6">
+                          {/* Order Header */}
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                            <div className="flex items-center gap-4">
+                              <div className="token-badge text-xl shadow-glow">
+                                #{activeOrder.tokenNumber}
+                              </div>
+                              <div>
+                                <div className="flex items-center gap-2">
+                                  <Badge className="bg-orange-100 text-orange-600 border-orange-200">
+                                    {activeOrder.status}
+                                  </Badge>
+                                  <span className="text-xs text-muted-foreground">{new Date(activeOrder.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                                </div>
+                                {activeOrder.itemNames && (
+                                  <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
+                                    {activeOrder.itemNames}
+                                  </p>
+                                )}
+                              </div>
+                            </div>
                           </div>
-                          {activeOrder.itemNames && (
-                            <p className="text-sm text-muted-foreground mt-1">
-                              {activeOrder.itemNames}
-                            </p>
-                          )}
+
+                          {/* Order Status Progress */}
+                          <div className="w-full pb-2">
+                            <OrderStatusProgress status={activeOrder.status} />
+                          </div>
                         </div>
-                      </div>
-                      <div className="flex items-center gap-2">
-
-                      </div>
-                    </div>
-
-                    {/* Order Status Progress */}
-                    <div className="w-full pb-4">
-                      <OrderStatusProgress status={activeOrder.status} />
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              </div>
             )}
 
             {/* Recommendations Section */}
@@ -796,85 +798,13 @@ export default function Dashboard() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-4 sm:p-5 space-y-4">
-                {cart.length === 0 ? (
-                  <div className="text-center py-12">
-                    <div className="h-16 w-16 mx-auto mb-4 rounded-2xl bg-muted/50 flex items-center justify-center">
-                      <ShoppingCart className="h-8 w-8 text-muted-foreground/50" />
-                    </div>
-                    <p className="font-medium text-foreground">Your cart is empty</p>
-                    <p className="text-sm text-muted-foreground mt-1">Add items from the menu</p>
-                  </div>
-                ) : isProcessingOrder ? (
-                  <div className="flex flex-col items-center justify-center py-12 space-y-4 animate-in fade-in">
-                    <div className="h-12 w-12 border-4 border-primary/30 border-t-primary rounded-full animate-spin" />
-                    <p className="font-medium text-foreground">Generating Token...</p>
-                    <p className="text-sm text-muted-foreground">Please wait while we secure your order.</p>
-                  </div>
-                ) : (
-                  <>
-                    <div className="space-y-3 max-h-72 overflow-y-auto pr-1">
-                      {cart.map(item => (
-                        <div key={item.menuItem.id} className="flex items-center justify-between p-4 rounded-xl bg-muted/30 border border-border/50">
-                          <div className="flex-1 min-w-0">
-                            <p className="font-medium text-sm truncate text-foreground">
-                              {item.menuItem.name}
-                            </p>
-                            <p className="text-sm text-muted-foreground">
-                              ₹{item.menuItem.price} × {item.quantity}
-                            </p>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <Button
-                              variant="outline"
-                              size="icon"
-                              className="h-8 w-8 rounded-lg hover:bg-destructive/10 hover:border-destructive/50 hover:text-destructive"
-                              onClick={() => updateQuantity(item.menuItem.id, -1)}
-                            >
-                              <Minus className="h-3 w-3" />
-                            </Button>
-                            <span className="w-6 text-center font-semibold text-foreground">{item.quantity}</span>
-                            <Button
-                              variant="outline"
-                              size="icon"
-                              className="h-8 w-8 rounded-lg hover:bg-emerald-500/10 hover:border-emerald-500/50 hover:text-emerald-600"
-                              onClick={() => updateQuantity(item.menuItem.id, 1)}
-                            >
-                              <Plus className="h-3 w-3" />
-                            </Button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-
-                    <div className="border-t border-border/50 pt-5 space-y-4">
-                      <div className="flex justify-between items-center">
-                        <span className="text-muted-foreground">Subtotal</span>
-                        <span className="text-lg font-medium text-foreground">₹{cartTotal}</span>
-                      </div>
-                      <div className="flex justify-between items-center">
-                        <span className="font-semibold text-foreground">Total</span>
-                        <span className="text-2xl font-bold text-foreground">₹{cartTotal}</span>
-                      </div>
-                      <Button
-                        className="w-full h-14 text-base gradient-primary border-0 shadow-soft hover:shadow-glow transition-all text-white"
-                        onClick={placeOrder}
-                        disabled={isProcessingOrder}
-                      >
-                        {isProcessingOrder ? (
-                          <span className="flex items-center gap-2">
-                            <div className="h-4 w-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                            Processing...
-                          </span>
-                        ) : (
-                          <>
-                            <Ticket className="h-5 w-5 mr-2" />
-                            Place Order & Get Token
-                          </>
-                        )}
-                      </Button>
-                    </div>
-                  </>
-                )}
+                <CartContent
+                  cart={cart}
+                  isProcessingOrder={isProcessingOrder}
+                  updateQuantity={updateQuantity}
+                  cartTotal={cartTotal}
+                  placeOrder={placeOrder}
+                />
               </CardContent>
             </Card>
           </div>
@@ -883,27 +813,43 @@ export default function Dashboard() {
 
       <Chatbot />
 
-      {/* Mobile Sticky Cart Footer */}
-      {
-        cart.length > 0 && (
-          <div className="fixed bottom-0 left-0 w-full p-4 bg-background/80 backdrop-blur-lg border-t border-border z-40 md:hidden animate-slide-up">
-            <div className="flex items-center justify-between gap-4">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">{cartCount} items</p>
-                <p className="text-lg font-bold text-foreground">₹{cartTotal}</p>
+      {/* MOBILE STICKY CART BAR */}
+      {cart.length > 0 && (
+        <div className="fixed bottom-0 left-0 right-0 z-50 p-4 bg-background border-t border-border/50 lg:hidden shadow-[0_-5px_20px_-5px_rgba(0,0,0,0.1)] animate-in slide-in-from-bottom-5">
+          <Sheet>
+            <SheetTrigger asChild>
+              <div className="container flex items-center gap-4 cursor-pointer">
+                <div className="flex-1">
+                  <p className="text-xs text-muted-foreground uppercase font-bold tracking-wider">{cartCount} Items</p>
+                  <p className="text-xl font-bold">₹{cartTotal}</p>
+                </div>
+                <Button size="lg" className="gradient-primary shadow-soft text-white px-8 font-bold">
+                  View Cart
+                </Button>
               </div>
-              <Button
-                className="gradient-primary text-white shadow-soft rounded-xl px-8"
-                onClick={() => {
-                  document.getElementById('cart-section')?.scrollIntoView({ behavior: 'smooth' });
-                }}
-              >
-                View Cart
-              </Button>
-            </div>
-          </div>
-        )
-      }
+            </SheetTrigger>
+            <SheetContent side="bottom" className="h-[80vh] rounded-t-3xl">
+              <SheetHeader className="mb-4 text-left">
+                <SheetTitle className="flex items-center gap-2">
+                  <div className="h-8 w-8 rounded-lg gradient-primary flex items-center justify-center shadow-soft">
+                    <ShoppingCart className="h-4 w-4 text-white" />
+                  </div>
+                  Your Cart
+                </SheetTitle>
+              </SheetHeader>
+              <div className="h-full pb-10 overflow-y-auto">
+                <CartContent
+                  cart={cart}
+                  isProcessingOrder={isProcessingOrder}
+                  updateQuantity={updateQuantity}
+                  cartTotal={cartTotal}
+                  placeOrder={placeOrder}
+                />
+              </div>
+            </SheetContent>
+          </Sheet>
+        </div>
+      )}
 
       <FeedbackModal
         isOpen={showFeedbackModal}
@@ -913,5 +859,93 @@ export default function Dashboard() {
         orderId={lastOrderId}
       />
     </div >
+  );
+}
+
+// Extracted Cart Content Component to resolve duplication and nesting issues
+function CartContent({ cart, isProcessingOrder, updateQuantity, cartTotal, placeOrder }: any) {
+  if (cart.length === 0) {
+    return (
+      <div className="text-center py-12">
+        <div className="h-16 w-16 mx-auto mb-4 rounded-2xl bg-muted/50 flex items-center justify-center">
+          <ShoppingCart className="h-8 w-8 text-muted-foreground/50" />
+        </div>
+        <p className="text-muted-foreground">Your cart is empty.</p>
+        <p className="text-xs text-muted-foreground mt-1">Add items to start ordering!</p>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <div className="space-y-3 max-h-[40vh] overflow-y-auto pr-1">
+        {cart.map((item: any) => (
+          <div key={item.menuItem.id} className="flex gap-3 p-3 rounded-xl bg-muted/30 border border-border/50">
+            <img
+              src={item.menuItem.imageUrl}
+              alt={item.menuItem.name}
+              className="h-16 w-16 rounded-lg object-cover bg-muted"
+            />
+            <div className="flex-1 min-w-0">
+              <div className="flex justify-between items-start">
+                <h4 className="font-semibold text-sm truncate">{item.menuItem.name}</h4>
+                <p className="font-bold text-sm">₹{item.menuItem.price * item.quantity}</p>
+              </div>
+              <div className="flex items-center gap-3 mt-3">
+                <div className="flex items-center gap-1 bg-background rounded-lg border border-border/50 p-0.5 shadow-sm">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6 rounded-md hover:bg-muted"
+                    onClick={() => updateQuantity(item.menuItem.id, -1)}
+                  >
+                    <Minus className="h-3 w-3" />
+                  </Button>
+                  <span className="w-6 text-center text-xs font-semibold">{item.quantity}</span>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6 rounded-md hover:bg-muted"
+                    onClick={() => updateQuantity(item.menuItem.id, 1)}
+                  >
+                    <Plus className="h-3 w-3" />
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="space-y-3 pt-4 border-t border-border/50">
+        <div className="flex justify-between text-sm">
+          <span className="text-muted-foreground">Subtotal</span>
+          <span>₹{cartTotal}</span>
+        </div>
+        <div className="flex justify-between text-lg font-bold text-foreground">
+          <span>Total</span>
+          <span>₹{cartTotal}</span>
+        </div>
+        <Button
+          className="w-full gradient-primary shadow-soft hover:shadow-glow transition-all py-6 text-lg font-bold text-white relative overflow-hidden"
+          onClick={placeOrder}
+          disabled={isProcessingOrder}
+        >
+          {isProcessingOrder ? (
+            <>
+              <span className="absolute inset-0 bg-white/20 animate-pulse" />
+              Processing...
+            </>
+          ) : (
+            <>
+              Place Order
+              <span className="absolute right-4 top-1/2 -translate-y-1/2 bg-white/20 px-2 py-0.5 rounded text-xs">
+                ₹{cartTotal}
+              </span>
+            </>
+          )}
+        </Button>
+      </div>
+    </>
   );
 }
