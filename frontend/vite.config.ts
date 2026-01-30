@@ -16,7 +16,8 @@ export default defineConfig(({ mode }) => ({
 
     // PWA Plugin
     VitePWA({
-      registerType: "autoUpdate",
+      registerType: "prompt",
+      injectRegister: false,
       includeAssets: ["favicon.ico"],
       manifest: {
         name: "Campobite",
