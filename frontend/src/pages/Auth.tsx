@@ -11,8 +11,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useToast } from '@/hooks/use-toast';
 import { Utensils, ArrowLeft, Eye, EyeOff } from 'lucide-react';
 
-const API = 'https://campobite.onrender.com';
-//const API = 'http://localhost:8082'
+//const API = 'https://campobite.onrender.com';
+const API = 'http://localhost:8082'
 
 
 export default function Auth() {
