@@ -37,7 +37,14 @@ public class ChatService {
     }
 
     public UserQuery submitQuery(String userEmail, String queryText) {
-        return queryRepo.save(new UserQuery(userEmail, queryText));
+        String userName = "Anonymous";
+        if (userEmail != null && !userEmail.equals("Anonymous")) {
+            User user = userRepo.findByEmail(userEmail).orElse(null);
+            if (user != null && user.getName() != null) {
+                userName = user.getName();
+            }
+        }
+        return queryRepo.save(new UserQuery(userEmail, userName, queryText));
     }
 
     public UserQuery getQuery(Long id) {

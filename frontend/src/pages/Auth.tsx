@@ -11,7 +11,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useToast } from '@/hooks/use-toast';
 import { Utensils, ArrowLeft, Eye, EyeOff } from 'lucide-react';
 
-const API = 'http://localhost:8082/api/auth';
+const API = 'https://campobite.onrender.com';
+//const API = 'http://localhost:8082'
 
 
 export default function Auth() {
@@ -51,7 +52,7 @@ export default function Auth() {
     try {
       setIsLoading(true);
 
-      await axios.post(`${API}/signup`, {
+      await axios.post(`${API}/api/auth/signup`, {
         name: signupData.name,
         email: signupData.email,
         password: signupData.password,
@@ -84,7 +85,7 @@ export default function Auth() {
     console.log("LOGIN BUTTON CLICKED");
 
     try {
-      const res = await axios.post(`${API}/login`, loginData);
+      const res = await axios.post(`${API}/api/auth/login`, loginData);
 
       console.log("AXIOS RESPONSE:", res.data);
 
@@ -117,7 +118,7 @@ export default function Auth() {
   /* ================= GOOGLE SIGNUP ================= */
   const handleGoogleSignup = async (res: any) => {
     try {
-      await axios.post(`${API}/google/signup`, {
+      await axios.post(`${API}/api/auth/google/signup`, {
         token: res.credential,
       });
 
@@ -153,7 +154,7 @@ export default function Auth() {
   /* ================= GOOGLE LOGIN ================= */
   const handleGoogleLogin = async (res: any) => {
     try {
-      const response = await axios.post(`${API}/google/login`, {
+      const response = await axios.post(`${API}/api/auth/google/login`, {
         token: res.credential,
       });
 
@@ -260,10 +261,12 @@ export default function Auth() {
 
                   <div className="text-center text-xs text-muted-foreground">OR</div>
 
-                  <GoogleLogin
-                    onSuccess={handleGoogleLogin}
-                    onError={() => console.log('Google Login Failed')}
-                  />
+                  <div className="flex justify-center w-full">
+                    <GoogleLogin
+                      onSuccess={handleGoogleLogin}
+                      onError={() => console.log('Google Login Failed')}
+                    />
+                  </div>
                 </form>
               </TabsContent>
 
@@ -301,6 +304,7 @@ export default function Auth() {
                     <SelectContent>
                       <SelectItem value="student">Student</SelectItem>
                       <SelectItem value="faculty">Faculty</SelectItem>
+
 
 
                     </SelectContent>
@@ -346,10 +350,12 @@ export default function Auth() {
 
                   <div className="text-center text-xs text-muted-foreground">OR</div>
 
-                  <GoogleLogin
-                    onSuccess={handleGoogleSignup}
-                    onError={() => console.log('Google Signup Failed')}
-                  />
+                  <div className="flex justify-center w-full">
+                    <GoogleLogin
+                      onSuccess={handleGoogleSignup}
+                      onError={() => console.log('Google Signup Failed')}
+                    />
+                  </div>
                 </form>
               </TabsContent>
             </Tabs>

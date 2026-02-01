@@ -49,11 +49,10 @@ public class DashboardController {
                 User user = userRepo.findByEmail(auth.getName())
                                 .orElseThrow(() -> new RuntimeException("User not found for email: " + auth.getName()));
 
-                Order activeOrder = orderRepo
-                                .findFirstByUserIdAndStatusIn(
+                List<Order> activeOrders = orderRepo
+                                .findByUserIdAndStatusIn(
                                                 user.getId(),
-                                                List.of("ORDERED", "PREPARING", "READY"))
-                                .orElse(null);
+                                                List.of("ORDERED", "PREPARING", "READY"));
 
                 List<Order> history = orderRepo.findByUserIdOrderByCreatedAtDesc(user.getId());
 
@@ -65,7 +64,12 @@ public class DashboardController {
 
                 Map<String, Object> response = new HashMap<>();
                 response.put("user", userMap);
-                response.put("activeOrder", activeOrder);
+                // Keep activeOrder for backward compatibility if needed, or just remove it.
+                // For now, let's just make sure frontend uses activeOrders.
+                response.put("activeOrders", activeOrders);
+                // Providing the first one as "activeOrder" legacy support might be nice but
+                // plan said activeOrders.
+                response.put("activeOrder", activeOrders.isEmpty() ? null : activeOrders.get(0));
                 response.put("orderHistory", history);
 
                 return response;

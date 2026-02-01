@@ -1,7 +1,5 @@
-/* public/firebase-messaging-sw.js */
-
-importScripts('https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js');
-importScripts('https://www.gstatic.com/firebasejs/10.7.1/firebase-messaging-compat.js');
+importScripts("https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js");
+importScripts("https://www.gstatic.com/firebasejs/10.7.1/firebase-messaging-compat.js");
 
 firebase.initializeApp({
  apiKey: "AIzaSyDSfcNspKnmTuRsAzD2JJERxoK4-urvZ-g",
@@ -15,11 +13,14 @@ firebase.initializeApp({
 
 const messaging = firebase.messaging();
 
-messaging.onBackgroundMessage(function (payload) {
-  console.log('[firebase-messaging-sw.js] Background message ', payload);
+messaging.onBackgroundMessage((payload) => {
+  console.log("[SW] Background message:", payload);
 
-  self.registration.showNotification(payload.notification.title, {
-    body: payload.notification.body,
-    icon: '/logo.png',
+  const title = payload.data?.title ?? "CampoBite";
+  const body = payload.data?.body ?? "New update";
+
+  self.registration.showNotification(title, {
+    body,
+    icon: "/logo.png",
   });
 });
