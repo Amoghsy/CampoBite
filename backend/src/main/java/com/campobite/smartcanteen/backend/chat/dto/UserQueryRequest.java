@@ -1,0 +1,13 @@
+package com.campobite.smartcanteen.backend.chat.dto;
+
+public class UserQueryRequest {
+    private String query;
+
+    public String getQuery() {
+        return query;
+    }
+
+    public void setQuery(String query) {
+        this.query = query;
+    }
+}

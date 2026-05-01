@@ -1,0 +1,113 @@
+####################################
+# General
+####################################
+.DS_Store
+Thumbs.db
+*.log
+*.tmp
+*.bak
+
+####################################
+# Environment / Secrets
+####################################
+.env
+
+frontend/.env
+
+backend/.env
+
+
+####################################
+# Backend - Spring Boot
+####################################
+backend/target/
+backend/build/
+backend/logs/
+backend/*.log
+
+# Spring secret config files
+backend/src/main/resources/application.properties
+backend/src/main/resources/application-*.properties
+backend/src/main/resources/serviceAccountKey.json
+
+####################################
+# Maven / Gradle (GLOBAL)
+####################################
+**/target/
+**/.gradle/
+**/build/
+
+####################################
+# Android Native (INSIDE campobite_mobile_app)
+####################################
+
+# Android build outputs
+campobite_mobile_app/android/build/
+campobite_mobile_app/android/app/build/
+campobite_mobile_app/android/.gradle/
+
+# Keystores (IMPORTANT)
+campobite_mobile_app/android/debug.keystore
+campobite_mobile_app/android/app/debug.keystore
+*.keystore
+*.jks
+
+# Firebase config (SECRET)
+campobite_mobile_app/android/app/google-services.json
+
+####################################
+# Node Modules (GLOBAL)
+####################################
+node_modules/
+frontend/node_modules/
+campobite_mobile_app/node_modules/
+
+####################################
+# Expo / React Native
+####################################
+.expo/
+.expo-shared/
+.expo-settings.json
+*.expo
+dist/
+build/
+
+####################################
+# Frontend - React / Vite
+####################################
+frontend/dist/
+frontend/build/
+frontend/.cache
+frontend/.vite
+frontend/npm-debug.log*
+frontend/yarn-debug.log*
+frontend/yarn-error.log*
+
+####################################
+# Database
+####################################
+database/data/
+database/dumps/
+database/*.db
+database/*.sqlite
+database/*.sql.backup
+
+####################################
+# IDE & Editor
+####################################
+.idea/
+.vscode/
+*.iml
+*.swp
+*.swo
+*.swn
+.classpath
+.project
+.settings/
+
+####################################
+# Compiled / Generated
+####################################
+*.class
+*.jar
+*.war

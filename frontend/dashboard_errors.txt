@@ -1,0 +1,7 @@
+[0m[0m
+[0m[4mD:\projects\javapbl\campobite\frontend\src\pages\Dashboard.tsx[24m[0m
+[0m  [2m282:5[22m  [31merror[39m    Use "@ts-expect-error" instead of "@ts-ignore", as "@ts-ignore" will do nothing if the following line is error-free  [2m@typescript-eslint/ban-ts-comment[22m[0m
+[0m  [2m330:6[22m  [33mwarning[39m  React Hook useEffect has a missing dependency: 'loadMenu'. Either include it or remove the dependency array          [2mreact-hooks/exhaustive-deps[22m[0m
+[0m[0m
+[0m[31m[1m✖ 2 problems (1 error, 1 warning)[22m[39m[0m
+[0m[31m[1m[22m[39m[0m
