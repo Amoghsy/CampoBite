@@ -13,9 +13,9 @@ const firebaseConfig = {
 console.log("[FCM] Firebase config loaded");
 
 const app = initializeApp(firebaseConfig);
-console.log("[FCM] Firebase initialized");
-
 const messaging = getMessaging(app);
+
+console.log("[FCM] Firebase initialized");
 console.log("[FCM] Messaging initialized");
 
 let firebaseSWRegistration: ServiceWorkerRegistration | null = null;
@@ -29,9 +29,17 @@ export const registerServiceWorker = async () => {
     { scope: "/" }
   );
 
-  console.log("[FCM] Firebase SW registered:", firebaseSWRegistration);
   await navigator.serviceWorker.ready;
-  console.log("[FCM] Firebase SW ready");
+
+  // Wait until the service worker is active
+  if (firebaseSWRegistration.active) {
+    firebaseSWRegistration.active.postMessage({
+      type: "FIREBASE_CONFIG",
+      config: firebaseConfig,
+    });
+  }
+
+  console.log("[FCM] Firebase SW registered");
 
   return firebaseSWRegistration;
 };
@@ -44,23 +52,27 @@ export const getFcmToken = async () => {
     }
 
     if (!firebaseSWRegistration) {
-      throw new Error("Firebase SW not registered yet");
+      throw new Error("Service Worker not registered");
     }
 
     const permission = await Notification.requestPermission();
+
     console.log("[FCM] Notification permission:", permission);
 
-    if (permission !== "granted") return null;
+    if (permission !== "granted") {
+      return null;
+    }
 
     const token = await getToken(messaging, {
       vapidKey: import.meta.env.VITE_FIREBASE_VAPID_KEY,
       serviceWorkerRegistration: firebaseSWRegistration,
     });
 
-    console.log("[FCM] FINAL FCM TOKEN:", token);
+    console.log("[FCM] FCM Token:", token);
+
     return token;
-  } catch (err) {
-    console.error("[FCM] Token error:", err);
+  } catch (error) {
+    console.error("[FCM] Error getting token:", error);
     return null;
   }
 };
@@ -70,8 +82,15 @@ export const listenNotifications = () => {
   onMessage(messaging, (payload) => {
     console.log("[FCM] Foreground message:", payload);
 
-    const title = payload.data?.title ?? "CampoBite";
-    const body = payload.data?.body ?? "New update";
+    const title =
+      payload.notification?.title ??
+      payload.data?.title ??
+      "CampoBite";
+
+    const body =
+      payload.notification?.body ??
+      payload.data?.body ??
+      "New update";
 
     new Notification(title, {
       body,
