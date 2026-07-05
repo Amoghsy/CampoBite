@@ -2,7 +2,7 @@ import axios from "axios";
 
 const api = axios.create({
 //baseURL: "http://localhost:8082",
- baseURL: "campobite-production.up.railway.app",
+ baseURL: "https://campobite-production.up.railway.app",
 });
 
 api.interceptors.request.use(config => {
