@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useToast } from '@/hooks/use-toast';
 import { Utensils, ArrowLeft, Eye, EyeOff, Mail, KeyRound, ArrowRight, Check, Users } from 'lucide-react';
 
-const API = 'https://campobite.onrender.com';
+const API = 'campobite-production.up.railway.app';
 //const API = 'http://localhost:8082'
 
 const PASSWORD_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
