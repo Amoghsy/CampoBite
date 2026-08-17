@@ -47,6 +47,7 @@ public class SecurityConfig {
                                                 .permitAll()
 
                                                 // ✅ PUBLIC endpoints
+                                                .requestMatchers("/api/health").permitAll()
                                                 .requestMatchers("/google/**").permitAll()
                                                 .requestMatchers("/api/auth/**").permitAll()
                                                 .requestMatchers("/api/payment/**").permitAll()
