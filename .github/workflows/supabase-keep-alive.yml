@@ -18,8 +18,17 @@ jobs:
             echo "SUPABASE_URL is not set"
             exit 1
           fi
-          if [[ ! "$SUPABASE_URL" =~ ^https?:// ]]; then
-            SUPABASE_URL="https://$SUPABASE_URL"
+          if [[ "$SUPABASE_URL" =~ ^https?:// ]]; then
+            SUPABASE_URL="${SUPABASE_URL%/}"
+          elif [[ "$SUPABASE_URL" =~ ^[a-zA-Z][a-zA-Z0-9+.-]*:// ]]; then
+            # Handle DSN-style secrets (for example, postgres://...@db.<ref>.supabase.co:5432/...)
+            SUPABASE_URL="${SUPABASE_URL#*://}"
+            SUPABASE_URL="${SUPABASE_URL#*@}"
+            SUPABASE_URL="${SUPABASE_URL%%/*}"
+            SUPABASE_URL="${SUPABASE_URL%%:*}"
+            SUPABASE_URL="https://${SUPABASE_URL#db.}"
+          else
+            SUPABASE_URL="https://${SUPABASE_URL%/}"
           fi
           curl -fsS "${SUPABASE_URL%/}/rest/v1/" \
             -H "apikey: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" \
